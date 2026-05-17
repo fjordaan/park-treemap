@@ -5,3 +5,8 @@ Thumbs.db
 .vscode/
 .idea/
 node_modules/
+
+# Planning / brief docs kept locally but not in the public repo
+park-treemap.md
+fc-treemap-context.md
+hosted-service-model.md
