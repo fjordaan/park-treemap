@@ -44,7 +44,7 @@ load any data, but that's expected. We'll fix that in step 4.
 
 Make a note of the **owner/repo** pair, e.g. `your-username/my-park-trees`.
 You'll need it twice: once in step 3 (as a Script Property), once in step 4
-(in the `index.html` CONFIG block).
+(in `config.js`).
 
 ## Next
 

@@ -14,10 +14,10 @@ Most often: the sheet isn't actually published to the web.
 
 Other causes:
 
-- The `SHEET_ID` in your `index.html` CONFIG block is wrong. Double-check
-  it's the long string between `/d/` and `/edit` in the sheet URL.
+- The `SHEET_ID` in your `config.js` is wrong. Double-check it's the long
+  string between `/d/` and `/edit` in the sheet URL.
 - The worksheet isn't called `Trees`. Either rename it back to `Trees`, or
-  update `SHEET_NAME` in the CONFIG block to match.
+  update `SHEET_NAME` in `config.js` to match.
 
 ## The map shows the world view and an empty welcome card
 

@@ -70,7 +70,7 @@ view the project.
    (project name) (unsafe)* (this warning is normal for your own scripts) →
    **Allow**.
 6. After deployment, copy the **Web app URL** that ends in `/exec`. You'll
-   paste this into `index.html` in step 4.
+   paste this into `config.js` in step 4.
 
 ## 3.5 Sanity check
 

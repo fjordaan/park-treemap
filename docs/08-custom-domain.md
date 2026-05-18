@@ -48,6 +48,6 @@ work as an installable PWA on iOS Safari, which requires HTTPS.
   yet. Wait 10–60 minutes and try again.
 - **HTTPS not available** — GitHub is still issuing the certificate. Untick
   *Enforce HTTPS*, wait 10 minutes, tick it again.
-- **The site loads but the map is missing** — your CONFIG block in
-  `index.html` still references the old URL somewhere, or your service worker
-  is caching aggressively. Hard refresh (Cmd-Shift-R / Ctrl-F5).
+- **The site loads but the map is missing** — your `config.js` still
+  references the old URL somewhere, or your service worker is caching
+  aggressively. Hard refresh (Cmd-Shift-R / Ctrl-F5).

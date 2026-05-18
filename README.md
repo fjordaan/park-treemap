@@ -28,8 +28,8 @@ order:
    project and turn on GitHub Pages.
 3. **[Create the Apps Script](docs/03-apps-script.md)** — paste a small
    script, set three secrets, and copy the deployment URL.
-4. **[Configure the app](docs/04-configure-app.md)** — edit one section of
-   `index.html` with your park name, Sheet ID, and Apps Script URL.
+4. **[Configure the app](docs/04-configure-app.md)** — edit `config.js`
+   with your park name, Sheet ID, and Apps Script URL.
 5. **[Add your first tree](docs/07-add-trees.md)** — open your live map and
    tap the *Add a tree* button.
 
@@ -49,6 +49,8 @@ That's it. Your map is live.
   so paths and amenities in your park are mapped properly.
 - **[Troubleshooting](docs/10-troubleshooting.md)** — common problems and
   fixes.
+- **[Keeping your map up to date](docs/11-keeping-up-to-date.md)** — pull in
+  improvements from the original project in one click.
 
 ## Credits
 
