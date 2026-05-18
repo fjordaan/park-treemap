@@ -40,6 +40,11 @@ there.
    fill in automatically thanks to the template formulas — leave them alone.
 3. At minimum, fill `Latitude`, `Longitude`, and `Scientific name`.
 
+> 💡 **Tip:** to grab coordinates from the map, click the **"Copy coords"**
+> button in the filter panel, then click the tree's location on the map. The
+> latitude and longitude are copied to your clipboard, ready to paste into
+> the two cells.
+
 ## Editing trees
 
 Just edit the spreadsheet. There's no "edit" mode in the map itself.
