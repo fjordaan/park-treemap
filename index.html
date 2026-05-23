@@ -1150,10 +1150,10 @@
     html += row('Number',           tree['Number']);
 
     const links = [];
-    if (tree['Wikipedia'])  links.push(`<a href="${tree['Wikipedia']}"  target="_blank" rel="noopener">Wikipedia</a>`);
-    if (tree['TSO'])        links.push(`<a href="${tree['TSO']}"        target="_blank" rel="noopener">TSO</a>`);
-    if (tree['Identification']) {
-      tree['Identification'].split(',').map(u => u.trim()).filter(Boolean).forEach(url => {
+    if (tree['Wikipedia link'])  links.push(`<a href="${tree['Wikipedia link']}"  target="_blank" rel="noopener">Wikipedia</a>`);
+    if (tree['TSO link'])        links.push(`<a href="${tree['TSO link']}"        target="_blank" rel="noopener">TSO</a>`);
+    if (tree['Identification link']) {
+      tree['Identification link'].split(',').map(u => u.trim()).filter(Boolean).forEach(url => {
         links.push(`<a href="${url}" target="_blank" rel="noopener">ID</a>`);
       });
     }
@@ -1366,7 +1366,7 @@
     }
     const selectedMonth = getSelectedMonth();
     if (selectedMonth) {
-      const months = (tree['Months'] || '').split(',').map(m => m.trim());
+      const months = (tree['Months (Seasonal interest)'] || '').split(',').map(m => m.trim());
       if (!months.includes(selectedMonth)) return false;
     }
     return true;

@@ -95,14 +95,26 @@ their phone. Open it in GitHub, click the pencil, and update:
 
 ## 4.5 Replace the icons (optional)
 
-The `icons/` folder contains placeholder icons. To use your own:
+The `icons/` folder ships with a generic tree silhouette so the map works
+straight away. Most adopters will want to replace it with something that
+reflects their park — for example a logo, or a photo of a notable tree.
 
-1. Create a square PNG at **192×192** and another at **512×512**.
-2. In GitHub, navigate to `icons/`, click **Add file → Upload files**, and
-   drop in your new files named `icon-192.png` and `icon-512.png`.
+To swap them out:
 
-A free tool like [favicon.io](https://favicon.io/) can generate these for
-you from a logo or even from text.
+1. Make a square PNG at **512×512** (this is the source image).
+2. Use a free tool like [favicon.io](https://favicon.io/) to resize it into
+   the four files listed below.
+3. In GitHub, navigate to `icons/`, click **Add file → Upload files**, and
+   drop in the new files, replacing the existing ones.
+
+The four files:
+
+| Filename                | Size     | Used for                         |
+|-------------------------|----------|----------------------------------|
+| `icon-512.png`          | 512×512  | PWA install on Android (large)   |
+| `icon-192.png`          | 192×192  | PWA install on Android (small)   |
+| `apple-touch-icon.png`  | 180×180  | "Add to Home Screen" on iOS      |
+| `favicon-32.png`        | 32×32    | Browser tab                      |
 
 ## 4.6 Visit your map
 

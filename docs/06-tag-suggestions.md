@@ -62,11 +62,12 @@ flagging trees for action.
 A more compact 3-value scheme (`Good` / `Fair` / `Poor`) is easier to apply
 consistently if multiple people add trees. Pick whichever you can sustain.
 
-## Months (comma-separated)
+## Months (Seasonal interest)
 
-For the *"Seasonal interest"* filter — when is this tree at its visual best?
-The header is fixed, but the values are free-text — use whatever is
-recognisable. The convention is the standard three-letter month abbreviation:
+Comma-separated values that drive the *"Seasonal interest"* filter — when
+is this tree at its visual best? The column header is fixed, but the
+values are free-text. The convention is the standard three-letter month
+abbreviation:
 
 `Jan, Feb, Mar, Apr, May, Jun, Jul, Aug, Sep, Oct, Nov, Dec`
 

@@ -25,7 +25,7 @@ minute or two (after a refresh).
 | **Year died**           | If set, the age calculation uses this as the end year instead of the current year.                                  |
 | **Form**                | e.g. *Standard*, *Multi-stem*, *Shrub*. Drives the *Form* filter.                                                   |
 | **Condition**           | e.g. *Good*, *Fair*, *Poor*, *Dead*. Drives the *Condition* filter.                                                 |
-| **Months**              | Comma-separated month names when this tree has visible seasonal interest (e.g. `Apr, May` for blossom).             |
+| **Months (Seasonal interest)** | Comma-separated month names when this tree has visible seasonal interest (e.g. `Apr, May` for blossom).        |
 | **TSO link**            | Full URL to the species' page on [Trees and Shrubs Online](https://www.treesandshrubsonline.org).                   |
 | **Wikipedia link**      | Full URL to the species' Wikipedia page. Shown as a link in the popup.                                              |
 | **Identification link** | One or more comma-separated URLs that helped identify the tree, if different. E.g. [TreeGuideUK](https://www.treeguideuk.co.uk/) |
