@@ -6,7 +6,7 @@ takes about 5 minutes.
 ## 2.1 Create a GitHub account
 
 If you don't already have one, sign up at <https://github.com/signup>. The
-free plan is plenty.
+free plan is fine.
 
 ## 2.2 Fork this repository
 
