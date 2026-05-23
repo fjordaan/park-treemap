@@ -40,6 +40,27 @@ The new tree won't appear on the map immediately — the map only loads from
 the sheet at page-load. Refresh after a few seconds and your tree will be
 there.
 
+## Adding photos to an existing tree
+
+Forgot to attach photos when you first added the tree? Want to add another
+photo a few months later? Open the tree's popup and look for the **+📷
+Add photo** button in the photo area:
+
+- If the tree has **no photos** yet, you'll see a single dashed slot
+  reading *"+📷 Add photo"*.
+- If the tree has 1, 2 or 3 photos, the *"+📷 Add photo"* slot sits
+  beside them.
+- If the tree already has 4 photos (the maximum), no slot is shown.
+
+Tap the slot, choose *📁 Choose photo* or *📷 Take photo*, pick or take
+your picture, and the new photo appears in the popup once the upload
+finishes.
+
+> 💡 The *"+📷 Add photo"* slot only appears if your map has
+> [trusted contributors](12-trusted-contributors.md) switched on and
+> your device is enrolled — or if the map is in open mode (any visitor
+> can add). Other visitors only see existing photos.
+
 ## Adding from the spreadsheet
 
 1. Open your sheet.

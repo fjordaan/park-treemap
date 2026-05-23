@@ -59,10 +59,11 @@ function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
     switch (data.action) {
-      case 'feedback':    return handleFeedback(data);
-      case 'addTree':     return requireContributorToken(data) || handleAddTree(data);
-      case 'uploadPhoto': return requireContributorToken(data) || handleUploadPhoto(data);
-      default:            return jsonResponse({ status: 'error', message: 'Unknown action: ' + data.action });
+      case 'feedback':      return handleFeedback(data);
+      case 'addTree':       return requireContributorToken(data) || handleAddTree(data);
+      case 'uploadPhoto':   return requireContributorToken(data) || handleUploadPhoto(data);
+      case 'appendPhotos':  return requireContributorToken(data) || handleAppendPhotos(data);
+      default:              return jsonResponse({ status: 'error', message: 'Unknown action: ' + data.action });
     }
   } catch (err) {
     Logger.log('doPost error: ' + err);
@@ -167,4 +168,48 @@ function handleUploadPhoto(data) {
     return jsonResponse({ status: 'error', code: code, message: resp.getContentText() });
   }
   return jsonResponse({ status: 'ok', path: path });
+}
+
+// ── Append photos to an existing tree ─────────────────────────────────────────
+// Used when a contributor adds a photo to a tree from inside its popup.
+// Identifies the row by Ref and appends the new paths to the Photos cell.
+// Wrapped in a script lock so two simultaneous appends to the same tree
+// can't lose data.
+function handleAppendPhotos(data) {
+  if (!data.ref || !Array.isArray(data.paths) || data.paths.length === 0) {
+    return jsonResponse({ status: 'error', message: 'Missing ref or paths' });
+  }
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const ss      = SpreadsheetApp.openById(sheetId());
+    const sheet   = ss.getSheetByName(TREES_SHEET);
+    if (!sheet) return jsonResponse({ status: 'error', message: 'Sheet "' + TREES_SHEET + '" not found' });
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const refCol    = headers.indexOf('Ref') + 1;
+    const photosCol = headers.indexOf('Photos') + 1;
+    if (!refCol || !photosCol) {
+      return jsonResponse({ status: 'error', message: 'Ref or Photos column not found' });
+    }
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return jsonResponse({ status: 'error', message: 'Tree not found' });
+    const refs = sheet.getRange(2, refCol, lastRow - 1, 1).getValues();
+    let rowIdx = -1;
+    for (let i = 0; i < refs.length; i++) {
+      if (String(refs[i][0]) === String(data.ref)) { rowIdx = i; break; }
+    }
+    if (rowIdx < 0) return jsonResponse({ status: 'error', message: 'Tree not found: ' + data.ref });
+    const rowNum  = rowIdx + 2;
+    const cell    = sheet.getRange(rowNum, photosCol);
+    const current = String(cell.getValue() || '').trim();
+    const existing = current ? current.split(',').map(s => s.trim()).filter(Boolean) : [];
+    if (existing.length + data.paths.length > 4) {
+      return jsonResponse({ status: 'error', message: 'Photo cap of 4 would be exceeded' });
+    }
+    const next = existing.concat(data.paths).join(', ');
+    cell.setValue(next);
+    return jsonResponse({ status: 'ok', photos: next });
+  } finally {
+    lock.releaseLock();
+  }
 }

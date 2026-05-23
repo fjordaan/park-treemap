@@ -35,6 +35,16 @@ enrolled separately — your phone, your laptop, etc.
 If you're the admin and you've forgotten the link, look up the
 `CONTRIBUTOR_TOKEN` value in your Apps Script's Script Properties.
 
+## I don't see the "+📷 Add photo" slot in tree popups
+
+Same reason as above — the slot is only shown to enrolled contributors
+when your map uses trusted-contributor mode. Visit your enrolment link
+once on this device.
+
+If the tree already has 4 photos (the maximum), the slot is hidden
+even for enrolled contributors — remove one in the spreadsheet's
+`Photos` column to make room.
+
 ## Submitted a tree but nothing happens
 
 Because of how Google Apps Script handles cross-origin requests, the browser

@@ -622,6 +622,29 @@
     .tree-popup .photos { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
     .tree-popup .photos a { display: block; flex: 1 1 calc(50% - 4px); cursor: zoom-in; }
     .tree-popup .photos img { width: 100%; height: 100px; object-fit: cover; border-radius: 3px; display: block; }
+    .tree-popup .photo-add-slot {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 4px;
+      flex: 1 1 calc(50% - 4px);
+      height: 100px;
+      border-radius: 3px;
+      border: 1.5px dashed #b5cfbf;
+      background: #f6fbf8;
+      color: #3a6e52;
+      font-family: inherit;
+      cursor: pointer;
+      padding: 4px;
+    }
+    .tree-popup .photo-add-slot:hover { background: #e8f4ec; border-color: #5a9e7a; }
+    .tree-popup .photo-add-slot[disabled] { opacity: 0.6; cursor: progress; }
+    .tree-popup .photo-add-slot-icon { font-size: 20px; line-height: 1; }
+    .tree-popup .photo-add-slot-label { font-size: 11px; font-weight: 600; }
+    .tree-popup .popup-photo-status {
+      font-size: 12px; color: #3a6e52;
+      background: #e8f4ec; border: 1px solid #b5cfbf;
+      padding: 4px 8px; border-radius: 4px;
+      margin-bottom: 6px;
+    }
 
     #lightbox {
       display: none;
@@ -784,6 +807,10 @@
     </div>
     <div id="picker-options"></div>
   </div>
+
+  <!-- Hidden file inputs used by the "Add photo to existing tree" flow -->
+  <input type="file" accept="image/*" multiple id="popup-photo-pick" hidden>
+  <input type="file" accept="image/*" capture="environment" id="popup-photo-capture" hidden>
 
   <button id="panel-toggle" onclick="togglePanel()">&#9658; Filters</button>
 
@@ -1250,7 +1277,8 @@
     `</div>`;
 
     const photos = parsePhotos(tree['Photos']);
-    if (photos.length) {
+    const canAddPhoto = canContribute() && tree['Ref'] && photos.length < 4;
+    if (photos.length || canAddPhoto) {
       html += `<div class="photos">`;
       const resolvedPhotos = photos.map(p => resolvePhotoUrl(p, 'w1600'));
       const resolvedAttr = JSON.stringify(resolvedPhotos).replace(/"/g, '&quot;');
@@ -1258,6 +1286,10 @@
         const thumb = resolvePhotoUrl(raw, 'w280');
         html += `<a href="#" data-photos="${resolvedAttr}" data-index="${i}" onclick="openLightbox(JSON.parse(this.dataset.photos), +this.dataset.index); return false;"><img src="${thumb}" loading="lazy" referrerpolicy="no-referrer" alt="Tree photo"/></a>`;
       });
+      if (canAddPhoto) {
+        const refAttr = (tree['Ref'] || '').replace(/'/g, '\\\'');
+        html += `<button type="button" class="photo-add-slot" title="Add a photo to this tree" onclick="addPhotoToExistingTree('${refAttr}'); return false;"><span class="photo-add-slot-icon">+📷</span><span class="photo-add-slot-label">Add photo</span></button>`;
+      }
       html += `</div>`;
     }
     html += row('Common name',      tree['Common name']);
@@ -2315,6 +2347,111 @@
       })
     });
   }
+
+  function appendPhotosToScript(ref, paths) {
+    return fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'appendPhotos',
+        token: readContributorToken(),
+        ref,
+        paths
+      })
+    });
+  }
+
+  // ── Add a photo to an existing tree (called from the popup slot) ──────────
+  // State carried across the asynchronous file-input flow:
+  let popupPhotoRef = null;     // Ref of the tree we're adding a photo to.
+  let popupPhotoBusy = false;   // Prevent overlapping uploads.
+
+  function addPhotoToExistingTree(ref) {
+    if (!canContribute()) return;
+    if (popupPhotoBusy) return;
+    if (!ref) {
+      alert('This tree has no Ref yet — try again after the next page reload.');
+      return;
+    }
+    popupPhotoRef = ref;
+    openPicker({
+      title: 'Add a photo',
+      options: [
+        { icon: '📁', label: 'Choose photo',
+          hint: 'Pick a photo from your library.',
+          onPick: () => document.getElementById('popup-photo-pick').click() },
+        { icon: '📷', label: 'Take photo',
+          hint: 'Use your camera to take a new photo.',
+          onPick: () => document.getElementById('popup-photo-capture').click() }
+      ]
+    });
+  }
+
+  async function handlePopupPhotoFiles(fileList) {
+    const ref = popupPhotoRef;
+    if (!ref) return;
+    popupPhotoRef = null;
+    if (popupPhotoBusy) return;
+    popupPhotoBusy = true;
+
+    // Find the tree object so we can compute the starting filename index
+    // and update its Photos value in memory after a successful append.
+    let tree = null;
+    markers.forEach((_marker, t) => { if (!tree && t['Ref'] === ref) tree = t; });
+    if (!tree) { popupPhotoBusy = false; return; }
+
+    const existing  = parsePhotos(tree['Photos']);
+    const remaining = 4 - existing.length;
+    const accepted  = [...fileList].filter(f => f.type.startsWith('image/')).slice(0, Math.max(0, remaining));
+    if (accepted.length === 0) { popupPhotoBusy = false; return; }
+
+    const popup = markers.get(tree)?.getPopup();
+    const setPopupStatus = (msg) => {
+      if (popup) popup.setContent(buildPopup(tree).replace(
+        '<div class="tree-popup">',
+        `<div class="tree-popup"><div class="popup-photo-status">${esc(msg)}</div>`
+      ));
+    };
+
+    const tok = 't-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+    const newPaths = [];
+    for (let i = 0; i < accepted.length; i++) {
+      setPopupStatus(`Uploading photo ${i + 1} of ${accepted.length}…`);
+      try {
+        const { base64 } = await compressImage(accepted[i]);
+        const filename = `${tok}-${i + 1}.jpg`;
+        await uploadPhotoToScript(filename, base64);
+        newPaths.push(`photos/${filename}`);
+      } catch (err) {
+        console.warn('Popup photo upload failed:', err);
+      }
+    }
+
+    if (newPaths.length) {
+      try { await appendPhotosToScript(ref, newPaths); }
+      catch (err) { console.warn('appendPhotos failed:', err); }
+      // Optimistically update the in-memory tree and re-render the popup.
+      const merged = existing.concat(newPaths).join(', ');
+      tree['Photos'] = merged;
+      if (popup) popup.setContent(buildPopup(tree));
+    } else {
+      setPopupStatus('Upload failed. Please try again.');
+    }
+
+    popupPhotoBusy = false;
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    ['popup-photo-pick', 'popup-photo-capture'].forEach(id => {
+      const input = document.getElementById(id);
+      if (!input) return;
+      input.addEventListener('change', async e => {
+        await handlePopupPhotoFiles(e.target.files);
+        e.target.value = '';
+      });
+    });
+  });
 
   // ── Submit ────────────────────────────────────────────────────────────────────
   async function submitAddTree(e) {
