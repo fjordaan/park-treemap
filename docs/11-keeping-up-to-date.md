@@ -30,6 +30,14 @@ That's the whole process. **You don't need to redeploy the Apps Script,
 re-publish the spreadsheet, or change anything else** — just click and
 wait.
 
+> Very occasionally an update will also change `apps-script.gs`. The
+> release notes will say so. In that case there's a one-off extra step
+> after syncing: open your Apps Script project at
+> [script.google.com](https://script.google.com), replace its code
+> with the new contents of `apps-script.gs` from your repo, save, then
+> **Deploy → Manage deployments → ✏️ → Version: New version → Deploy**
+> to keep the same URL.
+
 ## How often should I check?
 
 Whenever you remember. There's no harm in being behind by a few months — the
