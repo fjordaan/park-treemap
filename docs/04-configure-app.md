@@ -97,6 +97,8 @@ their phone. Open it in GitHub, click the pencil, and update:
   splash screen. Pick whatever fits your park's branding, or leave the
   defaults.
 
+> ⚠️ Leave `"start_url"` and `"scope"` set to `"./"`.
+
 ## 4.5 Replace the icons (optional)
 
 The `icons/` folder ships with a generic tree silhouette so the map works
