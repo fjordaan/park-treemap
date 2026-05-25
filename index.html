@@ -2355,6 +2355,13 @@
 
   // ── Add-tree method select ────────────────────────────────────────────────────
   function enterMethodSelect() {
+    // On desktop, Current location is rarely useful (laptops have no GPS and
+    // the user is almost never standing next to the tree). Skip the picker
+    // and go straight to click-on-map mode.
+    if (window.innerWidth > 767) {
+      enterClickMapMode();
+      return;
+    }
     addTreeState = 'method-select';
     openPicker({
       title: 'How would you like to place this tree?',
@@ -2362,8 +2369,8 @@
         { icon: '📍', label: 'Current location',
           hint: "Use your phone's GPS to place the tree where you're standing.",
           onPick: useCurrentLocation },
-        { icon: '🗺️', label: 'Click on map',
-          hint: (window.innerWidth <= 767 ? 'Tap' : 'Click') + ' anywhere on the map to drop the tree.',
+        { icon: '🗺️', label: 'Tap on map',
+          hint: 'Tap anywhere on the map to drop the tree.',
           onPick: enterClickMapMode }
       ]
     });
