@@ -14,6 +14,10 @@ const PARK_NAME        = 'Bayonne Park';
 const PARK_DESCRIPTION = 'Also known as Bayonne Road open space, it lies between the Bayonne Road estate and Greyhound Road. Created during the 1980s after a resident-led campaign.';
 const CONTACT_EMAIL    = 'info@twynholmtra.co.uk';
 
+// Optional. Your park or Friends-group website. Shown as a link in the
+// Info panel. Leave as '' to hide.
+const WEBSITE_URL      = 'https://www.twynholmtra.co.uk/';
+
 // — Your Google Sheet —
 // The long ID between /d/ and /edit in the spreadsheet URL.
 const SHEET_ID         = '1PWh7HCAGLxX_5pFyVdmlJHWvIiIYiOEF8P_BjZ9odew';
