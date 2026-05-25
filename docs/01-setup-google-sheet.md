@@ -30,6 +30,8 @@ The template comes with:
 
 ## 1.2 Make the sheet readable by anyone with the link
 
+<img src="screenshots/share-1-2-sheets-share.png" align="right" width="300" alt="Google Sheets Share dialog with General access set to 'Anyone with the link' / Viewer" />
+
 > ⚠️ **Without this step the map will be empty.** This is the single
 > most important setting in the whole setup.
 
