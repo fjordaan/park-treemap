@@ -37,7 +37,7 @@ const GITHUB_BRANCH    = 'main';
 // — Fallback map view —
 // Only used until your sheet has at least one tree. Once it does, the map
 // auto-fits to your trees and these values are ignored.
-const MAP_CENTER       = [51.5074, -0.1278]; // [latitude, longitude]
+const MAP_CENTER       = [51.485142, -0.215255]; // [latitude, longitude]
 const MAP_ZOOM         = 17;
 
 // — Trusted contributors —
