@@ -977,22 +977,22 @@
       <div class="month-grid" id="filter-months"></div>
     </div>
 
-    <div class="filter-section">
+    <div class="filter-section" id="filter-section-new-tags" style="display:none">
       <span class="filter-label">New trees</span>
       <div class="checkbox-group" id="filter-new-tags"></div>
     </div>
 
-    <div class="filter-section">
+    <div class="filter-section" id="filter-section-tags" style="display:none">
       <span class="filter-label">Tags</span>
       <div class="checkbox-group" id="filter-tags"></div>
     </div>
 
-    <div class="filter-section">
+    <div class="filter-section" id="filter-section-conditions" style="display:none">
       <span class="filter-label">Condition</span>
       <div class="checkbox-group" id="filter-conditions"></div>
     </div>
 
-    <div class="filter-section">
+    <div class="filter-section" id="filter-section-forms" style="display:none">
       <span class="filter-label">Form</span>
       <div class="checkbox-group" id="filter-forms"></div>
     </div>
@@ -1588,12 +1588,17 @@
     fillCheckboxes('filter-conditions', condBuckets,   'filter-condition');
     fillCheckboxes('filter-forms',      formBuckets,   'filter-form');
 
-    // Show the Seasonal interest filter only if at least one tree has a
-    // value in the Months (Seasonal interest) column. Hidden by default in
-    // the HTML, so adopters with no seasonal data don't see an empty grid.
-    if (trees.some(t => (t['Months (Seasonal interest)'] || '').trim())) {
-      document.getElementById('filter-section-months').style.display = '';
-    }
+    // Reveal filter sections only when their underlying column has any
+    // content — adopters with no Tags/Condition/Form data yet don't see
+    // empty filter groups. All sections are hidden by default in the HTML.
+    const showIf = (sectionId, hasContent) => {
+      if (hasContent) document.getElementById(sectionId).style.display = '';
+    };
+    showIf('filter-section-months',     trees.some(t => (t['Months (Seasonal interest)'] || '').trim()));
+    showIf('filter-section-new-tags',   Object.keys(newTagBuckets).length > 0);
+    showIf('filter-section-tags',       Object.keys(tagBuckets).length    > 0);
+    showIf('filter-section-conditions', Object.keys(condBuckets).length   > 0);
+    showIf('filter-section-forms',      Object.keys(formBuckets).length   > 0);
 
     // Insert "Non-native (hide)" filter after the Native checkbox, and a
     // "Hide self-sown" filter after the Self-sown checkbox.
