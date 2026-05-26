@@ -16,10 +16,10 @@ Give it a name like *"My Park trees"* and save it to your own Google Drive.
 The template comes with:
 
 - A **`Trees`** worksheet with all the required column headers in row 1.
-- **Row 2** is reserved for two ARRAYFORMULA cells — one in the `Ref`
+  - **Row 2** is reserved for two ARRAYFORMULA cells — one in the `Ref`
   column, one in the `Google Maps link` column. Each one computes its
   value for every tree row automatically.
-- **Tree data starts at row 3**, and the app appends new trees from
+  - **Tree data starts at row 3**, and the app appends new trees from
   there.
 - A **`Feedback`** worksheet where comments submitted by users will appear.
 
