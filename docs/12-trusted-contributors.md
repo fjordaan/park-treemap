@@ -61,6 +61,25 @@ devices you explicitly enrolled can add trees.
 > 💡 If a volunteer clears their browser data (or uses Private /
 > Incognito mode), they'll need to visit the magic link again.
 
+### Enrolling an installed app (iOS / Android home-screen)
+
+On iOS, when you "Add to Home Screen", the installed app runs in its
+own separate browsing context — with its own storage, completely
+isolated from Safari's. So if you enrolled the device in Safari and
+*then* added the app to your home screen, the home-screen app is
+**not** enrolled. (Android Chrome has similar isolation in some
+configurations.)
+
+The fix: open the app from your home screen, tap the **ⓘ** button in
+the top map header, and choose **"Enrol this device"**. Paste your
+magic link (or just the contributor password) into the prompt that
+appears. The *"+ Add a tree"* button will appear and stay enrolled
+for that installed app from now on.
+
+This same in-app enrolment works anywhere the magic link is awkward
+— inside a PWA, in a browser without a URL bar, or just for
+volunteers who'd rather paste a password than open a link.
+
 ## Sharing the magic link safely
 
 The magic link **is your password** — anyone who has it can enrol any

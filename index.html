@@ -615,8 +615,26 @@
     .feedback-status { font-size: 11px; color: #555; margin-top: 6px; }
     .feedback-status:empty { display: none; }
     .tree-popup .photos { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
-    .tree-popup .photos a { display: block; flex: 1 1 calc(50% - 4px); cursor: zoom-in; }
+    .tree-popup .photo-thumb-wrap { position: relative; flex: 1 1 calc(50% - 4px); }
+    .tree-popup .photo-thumb-link { display: block; cursor: zoom-in; }
     .tree-popup .photos img { width: 100%; height: 100px; object-fit: cover; border-radius: 3px; display: block; }
+    .tree-popup .photo-delete {
+      position: absolute;
+      top: 4px; right: 4px;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.55);
+      color: white;
+      display: flex; align-items: center; justify-content: center;
+      text-decoration: none;
+      opacity: 0.7;
+      transition: opacity 0.15s, background 0.15s;
+    }
+    .tree-popup .photo-delete:hover {
+      opacity: 1;
+      background: rgba(192, 57, 43, 0.9);
+    }
+    .tree-popup .photo-delete svg { display: block; }
     .tree-popup .photo-add-slot {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       gap: 4px;
@@ -776,7 +794,8 @@
     .map-header-info svg { display: block; }
     @media (max-width: 767px) {
       .map-header { max-width: calc(100vw - 20px); font-size: 13px; }
-      body.panel-open .map-header { display: none; }
+      body.panel-open .map-header,
+      body.popup-open .map-header { display: none; }
     }
 
     /* ── Info modal (centred desktop / bottom sheet mobile) ── */
@@ -920,6 +939,7 @@
     <div class="info-row" id="info-website-row">Website: <a id="info-website" href="#" target="_blank" rel="noopener"></a></div>
     <div class="info-row" id="info-contact-row">Contact: <a id="info-contact" href="#"></a></div>
     <div class="info-row" id="info-sheet-row">Tree spreadsheet: <a id="info-sheet" href="#" target="_blank" rel="noopener">open in Google Sheets</a></div>
+    <div class="info-row" id="info-enrol-row">Want to add trees from this device? <a href="#" onclick="enrolDeviceManually(); return false;">Enrol this device</a></div>
     <div id="info-attribution">
       Built with <a href="https://github.com/fjordaan/park-treemap" target="_blank" rel="noopener">park-treemap</a> — a free, self-hosted tree-map template for any park's "Friends of" group.
     </div>
@@ -1203,6 +1223,29 @@
     document.body.classList.toggle('contributor', canContribute());
   }
 
+  // Manual enrolment — needed when the user can't visit the magic link
+  // in this context (e.g. inside an iOS home-screen PWA, which has its
+  // own localStorage isolated from Safari's). Accepts the full magic link
+  // OR just the bare contributor token.
+  function enrolDeviceManually() {
+    const input = prompt(
+      'Paste your magic enrolment link, or just the contributor password:'
+    );
+    if (!input) return;
+    let token = input.trim();
+    try {
+      const url = new URL(token);
+      const param = url.searchParams.get('enrol');
+      if (param) token = param;
+    } catch (e) { /* not a URL, treat as bare token */ }
+    if (!token) return;
+    try { localStorage.setItem(CONTRIB_KEY, token); } catch (e) {}
+    applyContributorGate();
+    populateInfoModal();
+    closeInfoModal();
+    showToast('Device enrolled. The +Add a tree button is now available.');
+  }
+
   // ── Map header + Info modal ─────────────────────────────────────────────────
   function populateMapHeader() {
     const t = document.getElementById('map-header-title');
@@ -1243,6 +1286,17 @@
       if (sRow) sRow.style.display = '';
     } else {
       if (sRow) sRow.style.display = 'none';
+    }
+
+    // Enrol-this-device row — shown when the gate is on and this device
+    // isn't yet enrolled. Covers the iOS home-screen-PWA case (isolated
+    // localStorage from Safari), and any other "I can't visit the magic
+    // link here" scenario.
+    const enrolRow = document.getElementById('info-enrol-row');
+    if (ENABLE_CONTRIBUTOR_GATE && !isEnrolledContributor()) {
+      if (enrolRow) enrolRow.style.display = '';
+    } else {
+      if (enrolRow) enrolRow.style.display = 'none';
     }
   }
 
@@ -1433,6 +1487,16 @@
     return GITHUB_PHOTOS_BASE_URL + rel;
   }
 
+  // For a repo-hosted photo, build the GitHub "delete file" URL that takes
+  // an enrolled contributor straight to the confirmation page on GitHub.
+  // Returns null for external URLs (Google Photos etc.) — those can only be
+  // removed at their original host.
+  function repoPhotoDeleteUrl(raw) {
+    if (!raw || /^https?:\/\//i.test(raw)) return null;
+    const rel = raw.replace(/^\/+/, '').replace(/^photos\//, '');
+    return `https://github.com/${GITHUB_REPO}/delete/${GITHUB_BRANCH}/photos/${rel}`;
+  }
+
   function parsePhotos(photoStr) {
     if (!photoStr) return [];
     return photoStr.split(',').map(s => s.trim()).filter(Boolean);
@@ -1484,7 +1548,11 @@
       const resolvedAttr = JSON.stringify(resolvedPhotos).replace(/"/g, '&quot;');
       photos.forEach((raw, i) => {
         const thumb = resolvePhotoUrl(raw, 'w280');
-        html += `<a href="#" data-photos="${resolvedAttr}" data-index="${i}" onclick="openLightbox(JSON.parse(this.dataset.photos), +this.dataset.index); return false;"><img src="${thumb}" loading="lazy" referrerpolicy="no-referrer" alt="Tree photo"/></a>`;
+        const deleteUrl = canContribute() ? repoPhotoDeleteUrl(raw) : null;
+        const deleteOverlay = deleteUrl
+          ? `<a class="photo-delete" href="${esc(deleteUrl)}" target="_blank" rel="noopener" title="Delete this photo on GitHub" onclick="event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></a>`
+          : '';
+        html += `<div class="photo-thumb-wrap"><a class="photo-thumb-link" href="#" data-photos="${resolvedAttr}" data-index="${i}" onclick="openLightbox(JSON.parse(this.dataset.photos), +this.dataset.index); return false;"><img src="${thumb}" loading="lazy" referrerpolicy="no-referrer" alt="Tree photo"/></a>${deleteOverlay}</div>`;
       });
       if (canAddPhoto) {
         const refAttr = (tree['Ref'] || '').replace(/'/g, '\\\'');
@@ -2208,6 +2276,8 @@
     );
   }
 
+  map.on('popupopen',  () => document.body.classList.add('popup-open'));
+  map.on('popupclose', () => document.body.classList.remove('popup-open'));
   map.on('popupclose', closeFeedbackSheet);
 
   // ── INSTALL BANNER ───────────────────────────────────────────────────────────
