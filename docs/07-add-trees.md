@@ -70,6 +70,25 @@ finishes.
 > or on any device if your map is configured as fully open. Other
 > visitors only see existing photos.
 
+## Removing a photo from a tree
+
+If you're enrolled as a contributor, each uploaded photo in the popup
+has a small **trash icon** in its top-right corner. Tapping it opens
+that photo's **Delete file** page on GitHub in a new tab — click
+**Commit changes** there to remove it. (The trash icon only appears on
+photos hosted in your repo; photos linked from elsewhere, like Google
+Photos, don't show it — remove those at their original home.)
+
+Two things to know:
+
+- Deleting the file doesn't remove its reference from the spreadsheet.
+  After deleting, also clear that photo's path from the tree's `Photos`
+  cell, or the map will show a broken thumbnail until you do.
+- The file stays in your repository's history even after deletion (this
+  is just how git works). For ordinary tidying that's fine; for
+  genuinely sensitive content the only complete removal is to delete
+  the whole repository.
+
 ## Adding from the spreadsheet
 
 1. Open your sheet.
@@ -111,10 +130,11 @@ Either delete the row from the sheet, or — to keep history — set the tree's
 track losses over time.
 
 > ⚠️ If you delete a tree row that has uploaded photos, those photo files
-> will still be sitting in your `photos/` folder in the repo, taking up
-> space. They're not visible anywhere but they're not free either. To clean
-> them up, delete them in the GitHub web UI (open the file → trash icon →
-> commit).
+> stay in your `photos/` folder in the repo, taking up space. They're not
+> visible anywhere but they're not free either. Clean them up via the
+> trash icon on each photo in the popup *before* deleting the row, or
+> later in the GitHub web UI (open the file → delete → commit). See
+> [Removing a photo from a tree](#removing-a-photo-from-a-tree) above.
 
 ## Mobile-specific tips
 

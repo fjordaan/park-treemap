@@ -1240,10 +1240,10 @@
     } catch (e) { /* not a URL, treat as bare token */ }
     if (!token) return;
     try { localStorage.setItem(CONTRIB_KEY, token); } catch (e) {}
-    applyContributorGate();
-    populateInfoModal();
-    closeInfoModal();
-    showToast('Device enrolled. The +Add a tree button is now available.');
+    // Reload so every contributor-gated surface (Add Tree button, popup
+    // +Add photo slots, photo-delete overlays) re-renders enrolled. The
+    // map view is restored from the localStorage cache, so no jarring jump.
+    location.reload();
   }
 
   // ── Map header + Info modal ─────────────────────────────────────────────────
