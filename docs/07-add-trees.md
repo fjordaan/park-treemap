@@ -147,7 +147,7 @@ track losses over time.
 ## Photo upload tips
 
 - Photos are automatically resized to a max 1600px on the longest edge and
-  re-encoded as JPEG. A typical phone photo (8 MB) ends up around 400 KB.
+  re-encoded as JPEG. A typical phone photo (8 MB) ends up around 1 MB.
 - The upload is invisible to most adopters: photos are committed to your
   GitHub repository via the Apps Script behind the scenes. If you ever need
   to check, look in `photos/` in your repo — files are named like
