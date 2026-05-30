@@ -31,7 +31,7 @@ const APPS_SCRIPT_URL  = 'https://script.google.com/macros/s/AKfycbx2Pz3uzNHWE3K
 
 // — Your GitHub repository —
 // "owner/repo" — used to fetch uploaded photos.
-const GITHUB_REPO      = 'fulhamcemeteryfriends-dev/bayonne-trees';
+const GITHUB_REPO      = 'twynholmtra/bayonne-trees';
 const GITHUB_BRANCH    = 'main';
 
 // — Fallback map view —
