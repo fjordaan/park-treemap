@@ -1,7 +1,7 @@
 {
-  "name": "Park Tree Map",
-  "short_name": "Park Trees",
-  "description": "A tree map for our park.",
+  "name": "Bayonne Park tree map",
+  "short_name": "Bayonne Park Trees",
+  "description": "A tree map for Bayonne Park.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
