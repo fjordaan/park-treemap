@@ -297,6 +297,13 @@
       border: 1px solid #ccc; border-radius: 6px; background: #f5f5f5;
     }
     #add-tree-status { font-size: 12px; color: #666; margin-left: auto; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: inline-block; width: 10px; height: 10px;
+      border: 2px solid rgba(0,0,0,0.15); border-top-color: currentColor;
+      border-radius: 50%; animation: spin 0.65s linear infinite;
+      vertical-align: -1px; margin-right: 5px;
+    }
 
     /* ── Picker modal (reusable centred modal / mobile bottom sheet) ─────── */
     #picker-backdrop {
@@ -1894,6 +1901,10 @@
     return params.toString() ? `${base}?${params}` : base;
   }
 
+  function withSpinner(msg) {
+    return '<span class="spinner"></span>' + msg;
+  }
+
   function showToast(msg) {
     const toast = document.getElementById('add-toast');
     toast.textContent = msg;
@@ -2244,7 +2255,7 @@
   // ── FEEDBACK FORM ────────────────────────────────────────────────────────────
   function doSubmitFeedback(ref, tree, comment, btn, status, textarea, onSuccess) {
     btn.disabled = true;
-    status.textContent = 'Sending…';
+    status.innerHTML = withSpinner('Sending…');
     fetch(APPS_SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors',
@@ -2841,17 +2852,18 @@
     if (accepted.length === 0) { popupPhotoBusy = false; return; }
 
     const popup = markers.get(tree)?.getPopup();
-    const setPopupStatus = (msg) => {
+    const setPopupStatus = (msg, spinning = false) => {
+      const content = spinning ? withSpinner(esc(msg)) : esc(msg);
       if (popup) popup.setContent(buildPopup(tree).replace(
         '<div class="tree-popup">',
-        `<div class="tree-popup"><div class="popup-photo-status">${esc(msg)}</div>`
+        `<div class="tree-popup"><div class="popup-photo-status">${content}</div>`
       ));
     };
 
     const tok = 't-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
     const newPaths = [];
     for (let i = 0; i < accepted.length; i++) {
-      setPopupStatus(`Uploading photo ${i + 1} of ${accepted.length}…`);
+      setPopupStatus(`Uploading photo ${i + 1} of ${accepted.length}…`, true);
       try {
         const { base64 } = await compressImage(accepted[i]);
         const filename = `${tok}-${i + 1}.jpg`;
@@ -2906,7 +2918,7 @@
     // size limit and bundling multiple base64 photos risks hitting it).
     const photoPaths = [];
     for (let i = 0; i < pendingPhotos.length; i++) {
-      status.textContent = `Uploading photo ${i + 1} of ${pendingPhotos.length}…`;
+      status.innerHTML = withSpinner(`Uploading photo ${i + 1} of ${pendingPhotos.length}…`);
       const filename = `${tok}-${i + 1}.jpg`;
       try {
         await uploadPhotoToScript(filename, pendingPhotos[i].base64);
@@ -2931,7 +2943,7 @@
       condition:        tagifyCondition ? (tagifyCondition.value[0] || {}).value || '' : '',
       photos:           photoPaths.join(', ')
     };
-    status.textContent = 'Submitting…';
+    status.innerHTML = withSpinner('Submitting…');
     try {
       await fetch(APPS_SCRIPT_URL, {
         method: 'POST',

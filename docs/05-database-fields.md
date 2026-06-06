@@ -39,11 +39,9 @@ The `Tags` and `Condition` columns understand a few values specially:
   `New 2026`) gives the tree a distinctive diamond-shaped marker and gets it
   its own filter group called *New trees*. The year suffix is optional but
   recommended — it lets you filter and celebrate new plantings by year.
-- **`Native`** — if any tree in your sheet has this tag, the *Other* filter
-  group gets an extra *"Non-native (hide)"* option that hides trees with the
+- **`Native`** — if any tree in your sheet has this tag, it creates an extra *"Non-native"* option that hides trees with the
   `Native` tag. Useful for groups documenting non-native pressure.
-- **`Self-sown`** — same idea: adds a *"Hide self-sown"* option to the
-  *Other* filters.
+- **`Self-sown`** — same idea: adds a *"Hide self-sown"* option.
 - **`TBC`** — the tree's marker becomes a question mark (still working out
   what species it is).
 - **`Highlight`** — the marker becomes a star (a tree you want visitors to

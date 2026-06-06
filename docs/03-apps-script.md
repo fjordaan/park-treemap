@@ -98,13 +98,14 @@ who can view the project.
 5. The first time, Google will ask you to authorise the script. Click
    **Authorize access**, choose your account, and click *Advanced → Go to
    (project name) (unsafe)* (this warning is normal for your own scripts).
-7. A *"Select what (your-name) can access"* screen appears listing the
+   <img src="screenshots/step-3-4-apps-script-authorize.png" align="right" width="300" alt="Google Authorize dialog" />
+6. A *"Select what (your-name) can access"* screen appears listing the
    permissions the script needs. Tick **Select all**, then click
    **Continue**, then **Allow** on the final summary.
-   <img src="screenshots/step-3-4-test-deployments.png" alt="Apps Script 'Test deployments' / Manage deployments dialog showing the Web app URL" width="300" align="right" />
-9. After deployment, copy the **Web app URL**. You'll paste this into
+7. After deployment, copy the **Web app URL**. You'll paste this into
    `config.js` in step 4.
    > ⚠️ Copy the **whole URL**, not just the deployment ID. 
+<img src="screenshots/step-3-4-test-deployments.png" alt="Apps Script 'Test deployments' / Manage deployments dialog showing the Web app URL" width="300" />
 
 ## 3.5 Sanity check
 
