@@ -64,6 +64,8 @@ function doPost(e) {
       case 'uploadPhoto':   return requireContributorToken(data) || handleUploadPhoto(data);
       case 'appendPhotos':  return requireContributorToken(data) || handleAppendPhotos(data);
       case 'deletePhoto':   return requireContributorToken(data) || handleDeletePhoto(data);
+      case 'editTree':      return requireContributorToken(data) || handleEditTree(data);
+      case 'deleteTree':    return requireContributorToken(data) || handleDeleteTree(data);
       default:              return jsonResponse({ status: 'error', message: 'Unknown action: ' + data.action });
     }
   } catch (err) {
@@ -299,6 +301,82 @@ function handleDeletePhoto(data) {
     const next = remaining.join(', ');
     cell.setValue(next);
     return jsonResponse({ status: 'ok', photos: next });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ── Edit an existing tree ─────────────────────────────────────────────────────
+// Updates the editable fields of a tree row identified by Ref.
+// Never touches Ref, Latitude, Longitude, Photos, or the formula columns.
+function handleEditTree(data) {
+  if (!data.ref) {
+    return jsonResponse({ status: 'error', message: 'Missing ref' });
+  }
+  const ss    = SpreadsheetApp.openById(sheetId());
+  const sheet = ss.getSheetByName(TREES_SHEET);
+  if (!sheet) return jsonResponse({ status: 'error', message: 'Sheet "' + TREES_SHEET + '" not found' });
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const row = findTreeRow(sheet, data.ref);
+  if (row && row.error) return jsonResponse({ status: 'error', message: row.error });
+  if (!row) return jsonResponse({ status: 'error', message: 'Tree not found: ' + data.ref });
+  const set = (colName, value) => {
+    const i = headers.indexOf(colName);
+    if (i >= 0 && value !== undefined) sheet.getRange(row.rowNum, i + 1).setValue(value || '');
+  };
+  set('Scientific name',   data.sci);
+  set('Common name',       data.common);
+  set('Short name',        data.short_name);
+  set('Tags',              data.tags);
+  set('Notes',             data.notes);
+  set('Year planted',      data.year_planted);
+  set('Est. year planted', data.est_year_planted);
+  set('Year died',         data.year_died);
+  set('Form',              data.form_field);
+  set('Condition',         data.condition);
+  return jsonResponse({ status: 'ok' });
+}
+
+// ── Delete a tree and its repo-hosted photos ──────────────────────────────────
+// Deletes each photo stored in the GitHub repo, then removes the row.
+// External photo URLs (Google Photos, etc.) are left at their origin — only
+// their reference in the sheet disappears along with the row.
+function handleDeleteTree(data) {
+  if (!data.ref) return jsonResponse({ status: 'error', message: 'Missing ref' });
+  const ss    = SpreadsheetApp.openById(sheetId());
+  const sheet = ss.getSheetByName(TREES_SHEET);
+  if (!sheet) return jsonResponse({ status: 'error', message: 'Sheet "' + TREES_SHEET + '" not found' });
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const row = findTreeRow(sheet, data.ref);
+    if (row && row.error) return jsonResponse({ status: 'error', message: row.error });
+    if (!row) return jsonResponse({ status: 'error', message: 'Tree not found: ' + data.ref });
+    // Delete each repo-hosted photo from GitHub.
+    const photosCell = String(sheet.getRange(row.rowNum, row.photosCol).getValue() || '').trim();
+    const repoPaths  = photosCell
+      .split(',').map(s => s.trim())
+      .filter(p => p && p.indexOf('..') === -1 && p.indexOf(PHOTOS_DIR + '/') === 0);
+    const repo  = githubRepo();
+    const token = githubToken();
+    if (repo && token && repoPaths.length) {
+      const ghHeaders = { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' };
+      for (const path of repoPaths) {
+        const apiUrl = 'https://api.github.com/repos/' + repo + '/contents/' + path;
+        const getResp = UrlFetchApp.fetch(apiUrl, { method: 'get', headers: ghHeaders, muteHttpExceptions: true });
+        if (getResp.getResponseCode() === 200) {
+          const sha = JSON.parse(getResp.getContentText()).sha;
+          UrlFetchApp.fetch(apiUrl, {
+            method: 'delete', contentType: 'application/json', headers: ghHeaders,
+            payload: JSON.stringify({ message: 'Delete photo ' + path + ' via park-treemap', sha, branch: GITHUB_BRANCH }),
+            muteHttpExceptions: true
+          });
+        }
+      }
+    }
+    // Delete the tree row.
+    sheet.deleteRow(row.rowNum);
+    return jsonResponse({ status: 'ok' });
   } finally {
     lock.releaseLock();
   }
