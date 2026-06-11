@@ -80,6 +80,10 @@ This same in-app enrolment works anywhere the magic link is awkward
 — inside a PWA, in a browser without a URL bar, or just for
 volunteers who'd rather paste a password than open a link.
 
+> 💡 **If you delete and re-add the home-screen icon** (e.g. to pick
+> up a new app icon), the fresh install gets a brand-new empty storage
+> context — so you'll need to re-enrol it too.
+
 ## Sharing the magic link safely
 
 The magic link **is your password** — anyone who has it can enrol any
