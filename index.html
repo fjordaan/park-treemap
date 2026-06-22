@@ -2150,13 +2150,16 @@
   let tagifyEditCondition = null;
 
   // ── DATA LOADING ─────────────────────────────────────────────────────────────
-  async function loadData() {
-    // Clear any pending-submission marker from a previous add
-    if (pendingAddMarker) {
-      map.removeLayer(pendingAddMarker);
-      pendingAddMarker = null;
+  async function loadData(opts = {}) {
+    const silent = opts.silent || false;
+    if (!silent) {
+      // Clear any pending-submission marker from a previous add
+      if (pendingAddMarker) {
+        map.removeLayer(pendingAddMarker);
+        pendingAddMarker = null;
+      }
+      document.getElementById('tree-count').textContent = 'Loading…';
     }
-    document.getElementById('tree-count').textContent = 'Loading…';
 
     let text;
     try {
@@ -2164,16 +2167,18 @@
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       text = await resp.text();
     } catch (err) {
-      document.getElementById('tree-count').textContent = 'Failed to load data';
-      console.error('Could not fetch tree data:', err);
-      showDataErrorOverlay(err);
-      return;
+      if (!silent) {
+        document.getElementById('tree-count').textContent = 'Failed to load data';
+        console.error('Could not fetch tree data:', err);
+        showDataErrorOverlay(err);
+      }
+      return null;
     }
 
     const rows = parseCSV(text);
     if (rows.length < 2) {
-      document.getElementById('tree-count').textContent = 'No data found';
-      return;
+      if (!silent) document.getElementById('tree-count').textContent = 'No data found';
+      return null;
     }
 
     const headers = rows[0].map(h => h.trim());
@@ -2191,6 +2196,9 @@
 
     const colourMap = buildColourMap(trees);
     const bounds = [];
+
+    for (const marker of markers.values()) map.removeLayer(marker);
+    markers.clear();
 
     for (const tree of trees) {
       const lat = parseFloat(tree['Latitude']);
@@ -2217,33 +2225,38 @@
       bounds.push([lat, lng]);
     }
 
-    if (bounds.length) {
-      map.fitBounds(bounds, { padding: [24, 24] });
-      hideWelcomeOverlay();
-      writeCachedView();
-    } else {
-      map.setView(MAP_CENTER, MAP_ZOOM);
-      showWelcomeOverlay();
+    if (!silent) {
+      if (bounds.length) {
+        map.fitBounds(bounds, { padding: [24, 24] });
+        hideWelcomeOverlay();
+        writeCachedView();
+      } else {
+        map.setView(MAP_CENTER, MAP_ZOOM);
+        showWelcomeOverlay();
+      }
     }
 
-    buildFilters(trees);
-    applyUrlFilters();
+    if (!silent) buildFilters(trees);
+    if (!silent) applyUrlFilters();
     updateLabels();
 
-    // Open popup for a specific tree if ?ref= is in the URL
-    const refParam = new URLSearchParams(window.location.search).get('ref');
-    if (refParam) {
-      for (const [tree, marker] of markers) {
-        if (tree['Ref'] === refParam) {
-          map.setView(marker.getLatLng(), Math.max(map.getZoom(), 18));
-          marker.openPopup();
-          break;
+    if (!silent) {
+      // Open popup for a specific tree if ?ref= is in the URL
+      const refParam = new URLSearchParams(window.location.search).get('ref');
+      if (refParam) {
+        for (const [tree, marker] of markers) {
+          if (tree['Ref'] === refParam) {
+            map.setView(marker.getLatLng(), Math.max(map.getZoom(), 18));
+            marker.openPopup();
+            break;
+          }
         }
       }
     }
 
     document.getElementById('tree-count').textContent =
       `${trees.length} tree${trees.length !== 1 ? 's' : ''} shown`;
+    return trees;
   }
 
   loadData();
@@ -3152,6 +3165,34 @@
     });
   });
 
+  // ── Silent reload after add-tree submission ───────────────────────────────────
+  function schedulePostSubmitReloads(lat, lng) {
+    const delays = [4000, 12000, 30000];
+    let attempt = 0;
+    async function tryReload() {
+      const trees = await loadData({ silent: true });
+      if (trees) {
+        const found = trees.some(t => {
+          const tLat = parseFloat(t['Latitude']);
+          const tLng = parseFloat(t['Longitude']);
+          return Math.abs(tLat - lat) < 0.000001 && Math.abs(tLng - lng) < 0.000001;
+        });
+        if (found) {
+          if (pendingAddMarker) { map.removeLayer(pendingAddMarker); pendingAddMarker = null; }
+          return;
+        }
+      }
+      attempt++;
+      if (attempt < delays.length) {
+        setTimeout(tryReload, delays[attempt]);
+      } else {
+        if (pendingAddMarker) { map.removeLayer(pendingAddMarker); pendingAddMarker = null; }
+        showToast('Tree submitted but not yet visible — it may take a few minutes to appear.');
+      }
+    }
+    setTimeout(tryReload, delays[0]);
+  }
+
   // ── Submit ────────────────────────────────────────────────────────────────────
   async function submitAddTree(e) {
     e.preventDefault();
@@ -3214,6 +3255,7 @@
       // Pan/zoom to the new tree so the adopter sees it, especially when the
       // first tree drops them away from the placeholder fallback view.
       map.flyTo([newLat, newLng], Math.max(map.getZoom(), 18), { duration: 1.0 });
+      schedulePostSubmitReloads(newLat, newLng);
       setTimeout(() => closeAddTreeModal(), 1800);
     } catch (err) {
       status.textContent = 'Error submitting. Please try again.';
