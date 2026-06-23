@@ -65,6 +65,6 @@ That's it. Your map is live.
 the essential, park-agnostic features. It uses
 [Leaflet](https://leafletjs.com/) for the map,
 [Tagify](https://yaireo.github.io/tagify/) for the tag inputs, and
-[OpenStreetMap](https://www.openstreetmap.org/) for the base map tiles.
+[OpenStreetMap](https://www.openstreetmap.org/) for the base map tiles, © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors.
 
 Released under the [MIT License](LICENSE).
