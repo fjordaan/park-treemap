@@ -61,7 +61,7 @@ That's it. Your map is live.
 
 ## Credits
 
-park-treemap is forked from the Fulham Cemetery tree map and stripped down to
+**park-treemap** is forked from the [Fulham Cemetery tree map](https://trees.fulhamcemeteryfriends.org.uk/) [(GitHub)](https://github.com/fjordaan/fc-treemap) and stripped down to
 the essential, park-agnostic features. It uses
 [Leaflet](https://leafletjs.com/) for the map,
 [Tagify](https://yaireo.github.io/tagify/) for the tag inputs, and
