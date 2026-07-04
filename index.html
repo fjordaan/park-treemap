@@ -2756,11 +2756,22 @@
     document.getElementById('add-tree-coords-display').textContent = `${lat}, ${lng}`;
     document.getElementById('add-tree-status').textContent = '';
     document.getElementById('btn-add-tree-submit').disabled = false;
-    // Populate datalist with known species
+    // Populate datalist with known species and wire up common-name autocomplete
     const dl = document.getElementById('add-tree-sci-list');
     if (!dl.children.length) {
-      const species = [...new Set([...markers.keys()].map(t => (t['Scientific name'] || '').trim()).filter(Boolean))].sort();
-      species.forEach(s => { const o = document.createElement('option'); o.value = s; dl.appendChild(o); });
+      const sciToCommon = new Map();
+      for (const t of markers.keys()) {
+        const s = (t['Scientific name'] || '').trim();
+        if (s && !sciToCommon.has(s)) sciToCommon.set(s, (t['Common name'] || '').trim());
+      }
+      [...sciToCommon.keys()].sort().forEach(s => { const o = document.createElement('option'); o.value = s; dl.appendChild(o); });
+      const sciInput    = document.querySelector('#add-tree-form input[name=sci]');
+      const commonInput = document.querySelector('#add-tree-form input[name=common]');
+      sciInput.addEventListener('change', () => {
+        if (commonInput.value) return;
+        const common = sciToCommon.get(sciInput.value.trim());
+        if (common) commonInput.value = common;
+      });
     }
     // Tagify — Tags
     const allTags = [...new Set([...markers.keys()].flatMap(t => parseTags(t['Tags'])))].sort();
