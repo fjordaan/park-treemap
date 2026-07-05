@@ -46,7 +46,7 @@ If the tree already has 4 photos (the maximum), the slot is hidden
 even for enrolled contributors — remove one in the spreadsheet's
 `Photos` column to make room.
 
-## I added a tree using my phone and it's position isn't correct
+## I added a tree using my phone and its position isn't correct
 
 When you add a tree with the **Use current location** button, it's placed using the phone's GPS positioning. Unfortunately, this isn't always accurate.
 
