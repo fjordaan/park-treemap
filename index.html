@@ -2421,7 +2421,7 @@
   // ── ADMIN CONFIG ─────────────────────────────────────────────────────────────
   async function loadAdminConfig() {
     try {
-      const resp = await fetch(ADMIN_CONFIG_URL);
+      const resp = await fetch(ADMIN_CONFIG_URL + '?t=' + Date.now());
       if (resp.ok) {
         const data = await resp.json();
         if (data && data.genusHues && typeof data.genusHues === 'object') {
