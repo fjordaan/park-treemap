@@ -885,6 +885,12 @@
     }
     #btn-reset-colours { background: none; border: 1px solid #ccc; color: #666; }
     #btn-reset-colours:hover { background: #f5f5f5; }
+    @media (min-width: 900px) {
+      #admin-panel {
+        top: 0; right: 0; bottom: 0; left: 50%;
+        box-shadow: -4px 0 20px rgba(0,0,0,0.18);
+      }
+    }
 
     /* ── Map header (floating panel at top centre) ── */
     .map-header {
@@ -2277,6 +2283,7 @@
   );
   baseLayers['Street map'].addTo(map);
   L.control.layers(baseLayers, null, { position: 'bottomleft' }).addTo(map);
+  map.on('moveend', writeCachedView);
 
   // Map<treeObject, L.Marker>
   const markers = new Map();
@@ -2367,9 +2374,8 @@
 
     if (!silent) {
       if (bounds.length) {
-        map.fitBounds(bounds, { padding: [24, 24] });
+        if (!readCachedView()) map.fitBounds(bounds, { padding: [24, 24] });
         hideWelcomeOverlay();
-        writeCachedView();
       } else {
         map.setView(MAP_CENTER, MAP_ZOOM);
         showWelcomeOverlay();
