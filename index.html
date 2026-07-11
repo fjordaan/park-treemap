@@ -1402,8 +1402,7 @@
   // The "tree map" suffix is added by code; PARK_NAME is just the park's name.
   const APP_TITLE = `${PARK_NAME} tree map`;
 
-  const ADMIN_CONFIG_URL =
-    `https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}/admin-config.json`;
+  const ADMIN_CONFIG_URL = './admin-config.json';
 
   // Mutable admin config — loaded at startup, updated on save.
   let adminConfig = { genusHues: {} };
@@ -2409,7 +2408,7 @@
   // ── ADMIN CONFIG ─────────────────────────────────────────────────────────────
   async function loadAdminConfig() {
     try {
-      const resp = await fetch(ADMIN_CONFIG_URL + '?t=' + Date.now());
+      const resp = await fetch(ADMIN_CONFIG_URL, { cache: 'no-cache' });
       if (resp.ok) {
         const data = await resp.json();
         if (data && data.genusHues && typeof data.genusHues === 'object') {
