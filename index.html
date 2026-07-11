@@ -892,7 +892,6 @@
     .palette-swatch.selected { border-color: #222; box-shadow: 0 0 0 1px #222; }
     .admin-actions {
       display: flex;
-      justify-content: space-between;
       margin-top: 16px;
       padding-top: 14px;
       border-top: 1px solid #f0f0f0;
@@ -905,9 +904,6 @@
     }
     #btn-reset-colours { background: none; border: 1px solid #ccc; color: #666; }
     #btn-reset-colours:hover { background: #f5f5f5; }
-    #btn-save-admin { background: #2c7a2c; border: none; color: white; font-weight: 600; }
-    #btn-save-admin:hover { background: #236823; }
-    #btn-save-admin:disabled { background: #aaa; cursor: default; }
 
     /* ── Map header (floating panel at top centre) ── */
     .map-header {
@@ -2435,14 +2431,33 @@
     } catch (e) { /* 404 or network error — keep defaults */ }
   }
 
+  let _adminOriginalHues = null;
+
   function openAdminPanel() {
+    _adminOriginalHues = Object.assign({}, adminConfig.genusHues || {});
     document.getElementById('admin-panel').style.display = 'flex';
     document.getElementById('admin-park-name').textContent = PARK_NAME;
     renderGenusColourList();
   }
 
-  function closeAdminPanel() {
+  function exitAdminPanel() {
     document.getElementById('admin-panel').style.display = 'none';
+    const p = new URLSearchParams(window.location.search);
+    p.delete('admin');
+    const q = p.toString();
+    window.history.replaceState({}, '', window.location.pathname + (q ? '?' + q : ''));
+  }
+
+  function cancelAdmin() {
+    adminConfig.genusHues = _adminOriginalHues || {};
+    document.querySelectorAll('.palette-picker').forEach(p => p.remove());
+    loadData({ silent: true });
+    exitAdminPanel();
+  }
+
+  function saveAndExitAdmin() {
+    saveAdminConfig();
+    exitAdminPanel();
   }
 
   function renderGenusColourList() {
@@ -2515,9 +2530,6 @@
   }
 
   function saveAdminConfig() {
-    const btn = document.getElementById('btn-save-admin');
-    btn.disabled = true;
-    btn.textContent = 'Saving…';
     fetch(APPS_SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors',
@@ -2528,8 +2540,6 @@
         config:  { version: 1, genusHues: adminConfig.genusHues || {} }
       })
     }).finally(() => {
-      btn.disabled = false;
-      btn.textContent = 'Save changes';
       showToast('Colours saved — visible to all viewers after reload.');
     });
   }
@@ -3721,7 +3731,10 @@
   <div id="admin-panel">
     <div id="admin-header">
       <span>Admin — <span id="admin-park-name"></span></span>
-      <button onclick="closeAdminPanel()">✕ Exit admin</button>
+      <div style="display:flex;gap:8px">
+        <button onclick="cancelAdmin()">Cancel</button>
+        <button onclick="saveAndExitAdmin()" style="background:rgba(255,255,255,0.9);color:#2c3e50;font-weight:600">Save &amp; Exit</button>
+      </div>
     </div>
     <div class="admin-content">
       <div class="admin-section">
@@ -3729,7 +3742,6 @@
         <div id="genus-colour-list"></div>
         <div class="admin-actions">
           <button id="btn-reset-colours" onclick="resetColours()">Reset to automatic</button>
-          <button id="btn-save-admin" onclick="saveAdminConfig()">Save changes</button>
         </div>
       </div>
       <div class="admin-section admin-section-stub">
