@@ -2476,7 +2476,7 @@
         `<span class="admin-colour-swatch" style="background:hsl(${hue},62%,48%)"></span>` +
         `<span class="genus-row-name">${g}</span>` +
         `<span class="genus-row-colour">${colourLabel}</span>` +
-        `<button class="btn-change-colour" onclick="openPalettePicker(${JSON.stringify(g)})">Change</button>`;
+        `<button class="btn-change-colour" onclick="openPalettePicker(this.closest('.genus-row').dataset.genus)">Change</button>`;
       list.appendChild(row);
     });
   }
@@ -2489,10 +2489,11 @@
     const currentHue = parseInt(row.dataset.hue, 10);
     const picker = document.createElement('div');
     picker.className = 'palette-picker';
+    picker.dataset.genus = genus;
     picker.innerHTML = COLOUR_PALETTE.map(({ name, hue }) =>
       `<button class="palette-swatch${hue === currentHue ? ' selected' : ''}" ` +
       `style="background:hsl(${hue},62%,48%)" title="${name}" ` +
-      `onclick="selectGenusColour(${JSON.stringify(genus)},${hue})"></button>`
+      `onclick="selectGenusColour(this.parentElement.dataset.genus,${hue})"></button>`
     ).join('');
     row.after(picker);
   }
