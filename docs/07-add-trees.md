@@ -118,22 +118,28 @@ Just don't type a tree's name into row 2.
 
 ## Editing trees
 
-Just edit the spreadsheet. There's no "edit" mode in the map itself.
+Open the tree's popup by clicking or tapping its marker, then click **Edit**.
+A form lets you update any of the tree's details — click **Save changes**
+when done.
 
-The Ref column won't change as long as you don't move the tree (it's
-derived from Latitude/Longitude).
+> 💡 The **Edit** button only appears on
+> [enrolled devices](12-trusted-contributors.md#enrolling-devices).
+> You can also edit the row directly in the spreadsheet.
 
 ## Removing trees
 
-Either delete the row from the sheet, or — to keep history — set the tree's
-`Condition` to `Dead`. Dead trees stay on the map as grey squares so you can
-track losses over time.
+Two ways:
 
-> ⚠️ If you delete a tree row that has uploaded photos, those photo files
-> stay in your `photos/` folder in the repo, taking up space. They're not
-> visible anywhere but they're not free either. Clean them up via the
-> trash icon on each photo in the popup *before* deleting the row — see
-> [Removing a photo from a tree](#removing-a-photo-from-a-tree) above.
+- **From the map**: open the popup, click **Edit**, then **Delete tree** at
+  the bottom of the form. This removes the row from the sheet and deletes
+  any uploaded photos in one step.
+- **From the spreadsheet**: delete the row. If the tree has uploaded photos,
+  remove them via the trash icon in the popup first (see
+  [Removing a photo from a tree](#removing-a-photo-from-a-tree)) — otherwise
+  the files stay in your repo.
+
+Rather than deleting, you can set `Condition` to `Dead`. Dead trees stay on
+the map as grey squares so you can track losses over time.
 
 ## Mobile-specific tips
 
