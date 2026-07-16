@@ -303,6 +303,12 @@
       background: #fdf2f2; color: #c0392b;
     }
     .btn-delete-tree:hover { background: #f5d5d5; }
+    .btn-reposition-tree {
+      font-size: 12px; padding: 7px 14px; cursor: pointer;
+      border: 1px solid #2a7ae2; border-radius: 6px;
+      background: #eaf1fb; color: #2a7ae2;
+    }
+    .btn-reposition-tree:hover { background: #d5e8f7; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .spinner {
       display: inline-block; width: 10px; height: 10px;
@@ -1212,7 +1218,8 @@
       </div>
       <div class="add-tree-actions">
         <button type="button" class="btn-cancel-modal" onclick="closeEditTreeModal()">Cancel</button>
-        <button type="button" class="btn-delete-tree" onclick="deleteCurrentEditTree()">Delete tree</button>
+        <button type="button" class="btn-delete-tree" onclick="deleteCurrentEditTree()">Delete</button>
+        <button type="button" class="btn-reposition-tree" onclick="startReposition()">Reposition</button>
         <span id="edit-tree-status"></span>
         <button type="submit" id="btn-edit-tree-submit">Save</button>
       </div>
@@ -2719,6 +2726,33 @@
     toast.innerHTML = '';
   }
 
+  // ── Reposition-tree mode ─────────────────────────────────────────────────────
+  let repositionTarget = null; // { ref, tree, marker } while active
+
+  function startReposition() {
+    const ref = document.getElementById('edit-tree-ref').value;
+    let tree = null, marker = null;
+    markers.forEach((m, t) => { if (!tree && t['Ref'] === ref) { tree = t; marker = m; } });
+    if (!tree) return;
+    closeEditTreeModal();
+    repositionTarget = { ref, tree, marker };
+    document.getElementById('map').classList.add('add-mode');
+    const toast = document.getElementById('add-toast');
+    const verb = window.innerWidth <= 767 ? 'Tap' : 'Click';
+    toast.innerHTML = `${verb} on the map to set the new location &nbsp; <a href="#" id="reposition-cancel" style="color:#fff;text-decoration:underline">Cancel</a>`;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    document.getElementById('reposition-cancel').onclick = (e) => { e.preventDefault(); cancelReposition(); };
+  }
+
+  function cancelReposition() {
+    repositionTarget = null;
+    document.getElementById('map').classList.remove('add-mode');
+    const toast = document.getElementById('add-toast');
+    toast.classList.remove('show');
+    toast.innerHTML = '';
+  }
+
   // ── Current location ─────────────────────────────────────────────────────────
   function useCurrentLocation() {
     if (!('geolocation' in navigator)) {
@@ -3375,6 +3409,21 @@
       if (addMarker) map.removeLayer(addMarker);
       addMarker = L.marker(e.latlng, { icon: crosshairIcon, interactive: false }).addTo(map);
       openAddTreeModal(lat, lng);
+    } else if (repositionTarget) {
+      const lat = e.latlng.lat.toFixed(7);
+      const lng = e.latlng.lng.toFixed(7);
+      const { ref, tree, marker } = repositionTarget;
+      cancelReposition();
+      marker.setLatLng([parseFloat(lat), parseFloat(lng)]);
+      tree['Latitude']  = lat;
+      tree['Longitude'] = lng;
+      fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'repositionTree', token: readContributorToken(), ref, lat, lng })
+      }).catch(err => console.warn('repositionTree fetch failed:', err));
+      showToast('Tree repositioned — reload to confirm.');
     }
   });
 
@@ -3386,6 +3435,7 @@
     if (addTreeState === 'modal-open') { closeAddTreeModal(); return; }
     if (addTreeState === 'copy-mode')  { exitCopyMode(); return; }
     if (addTreeState === 'click-map-mode') { cancelAddTree(); return; }
+    if (repositionTarget)              { cancelReposition(); return; }
   });
 
   // ── USER LOCATION ────────────────────────────────────────────────────────────
