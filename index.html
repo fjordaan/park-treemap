@@ -3721,6 +3721,8 @@
       const lat = e.latlng.lat.toFixed(7);
       const lng = e.latlng.lng.toFixed(7);
       const { ref, tree, marker } = repositionTarget;
+      const origLat = tree['Latitude'];
+      const origLng = tree['Longitude'];
       cancelReposition();
       marker.setLatLng([parseFloat(lat), parseFloat(lng)]);
       tree['Latitude']  = lat;
@@ -3731,7 +3733,22 @@
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action: 'repositionTree', token: readContributorToken(), ref, lat, lng })
       }).catch(err => console.warn('repositionTree fetch failed:', err));
-      showToast('Tree repositioned — reload to confirm.');
+      showToast('Tree repositioned…');
+      setTimeout(async () => {
+        const trees = await loadData({ silent: true });
+        if (!trees) return;
+        const updated = trees.find(t => t['Ref'] === ref);
+        if (updated &&
+            Math.abs(parseFloat(updated['Latitude'])  - parseFloat(lat)) < 0.000001 &&
+            Math.abs(parseFloat(updated['Longitude']) - parseFloat(lng)) < 0.000001) {
+          showToast('Tree repositioned.');
+        } else {
+          marker.setLatLng([parseFloat(origLat), parseFloat(origLng)]);
+          tree['Latitude']  = origLat;
+          tree['Longitude'] = origLng;
+          showToast('Reposition failed — please try again.');
+        }
+      }, 4000);
     }
   });
 
