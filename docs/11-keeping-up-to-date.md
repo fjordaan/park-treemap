@@ -26,17 +26,31 @@ GitHub will copy the latest improvements into your repository. GitHub Pages
 will rebuild your live site within about 30 seconds, and the update is
 live.
 
-That's the whole process. **You don't need to redeploy the Apps Script,
-re-publish the spreadsheet, or change anything else** — just click and
-wait.
+**You don't need to re-publish the spreadsheet or change anything else.**
+Most updates also leave the Apps Script untouched. When one does change it,
+the description in the Sync Fork panel will mention it — follow the steps
+in [Updating the Apps Script](#updating-the-apps-script) below.
 
-> Very occasionally an update will also change `apps-script.gs`. The
-> release notes will say so. In that case there's a one-off extra step
-> after syncing: open your Apps Script project at
-> [script.google.com](https://script.google.com), replace its code
-> with the new contents of `apps-script.gs` from your repo, save, then
-> **Deploy → Manage deployments → ✏️ → Version: New version → Deploy**
-> to keep the same URL.
+## Updating the Apps Script
+
+When a sync includes a change to `apps-script.gs`, you need to paste the
+new code into your Apps Script project and redeploy. Your Script Properties
+(passwords, tokens) are untouched — you don't need to re-enter them.
+
+1. Open your forked repo on GitHub and go to `apps-script.gs`. Click
+   **Raw** (top-right of the file viewer), then *Select All → Copy*.
+2. Go to [script.google.com](https://script.google.com) and open your
+   project.
+3. Select all the existing code in the editor, delete it, paste the new
+   code, and save (Ctrl+S / Cmd+S).
+4. Click **Deploy → Manage deployments**.
+5. Click the **✏️** (pencil) icon next to your existing deployment.
+6. Set **Version** to **New version**. You'll also see a description field
+   — enter something like *v2*, *v3*, etc. (or anything you like; it's
+   just a label for your own reference).
+7. Click **Deploy**.
+
+The Web app URL stays the same — no need to update `config.js`.
 
 ## How often should I check?
 
