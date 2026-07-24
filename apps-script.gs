@@ -413,3 +413,58 @@ function handleDeleteTree(data) {
     lock.releaseLock();
   }
 }
+
+// ── Save admin config (colour overrides, etc.) ────────────────────────────────
+// Writes admin-config.json to the GitHub repo. Creates the file on first save;
+// updates it (using the current SHA) on subsequent saves.
+function handleSaveAdminConfig(data) {
+  if (!data.config || typeof data.config !== 'object') {
+    return jsonResponse({ status: 'error', message: 'Missing or invalid config' });
+  }
+  // Sanitise genusHues: keys must be non-empty strings, values integers 0–359.
+  const genusHues = {};
+  if (data.config.genusHues && typeof data.config.genusHues === 'object') {
+    for (const genus in data.config.genusHues) {
+      const hue = data.config.genusHues[genus];
+      if (typeof genus === 'string' && genus.length &&
+          typeof hue === 'number' && hue === Math.floor(hue) && hue >= 0 && hue < 360) {
+        genusHues[genus] = hue;
+      }
+    }
+  }
+  const repo  = githubRepo();
+  const token = githubToken();
+  if (!repo || !token) {
+    return jsonResponse({ status: 'error', message: 'GITHUB_REPO and/or GITHUB_TOKEN not set' });
+  }
+  const jsonStr = JSON.stringify({ version: 1, genusHues: genusHues }, null, 2);
+  const content = Utilities.base64Encode(Utilities.newBlob(jsonStr, 'UTF-8').getBytes());
+  const apiUrl  = 'https://api.github.com/repos/' + repo + '/contents/admin-config.json';
+  const headers = { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' };
+  // GET current file SHA (needed to update an existing file; omitted for new file).
+  const getResp = UrlFetchApp.fetch(apiUrl, { method: 'get', headers: headers, muteHttpExceptions: true });
+  const getCode = getResp.getResponseCode();
+  if (getCode !== 200 && getCode !== 404) {
+    Logger.log('GitHub GET failed (' + getCode + '): ' + getResp.getContentText());
+    return jsonResponse({ status: 'error', code: getCode, message: 'GitHub GET failed' });
+  }
+  const putBody = {
+    message: 'Update admin config via park-treemap',
+    content: content,
+    branch:  GITHUB_BRANCH
+  };
+  if (getCode === 200) putBody.sha = JSON.parse(getResp.getContentText()).sha;
+  const putResp = UrlFetchApp.fetch(apiUrl, {
+    method:          'put',
+    contentType:     'application/json',
+    headers:         headers,
+    payload:         JSON.stringify(putBody),
+    muteHttpExceptions: true
+  });
+  const putCode = putResp.getResponseCode();
+  if (putCode < 200 || putCode >= 300) {
+    Logger.log('GitHub PUT failed (' + putCode + '): ' + putResp.getContentText());
+    return jsonResponse({ status: 'error', code: putCode, message: 'GitHub PUT failed' });
+  }
+  return jsonResponse({ status: 'ok' });
+}

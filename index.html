@@ -781,6 +781,124 @@
     #lightbox.loading #lightbox-img { opacity: 0; }
     @keyframes lb-spin { to { transform: rotate(360deg); } }
 
+    /* ── Admin panel ─────────────────────────────────────────────────────── */
+    #admin-panel {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 6000;
+      background: #f5f5f5;
+      flex-direction: column;
+      font-family: inherit;
+    }
+    #admin-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      background: #2c3e50;
+      color: white;
+      font-size: 15px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    #admin-header button {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: white;
+      border-radius: 4px;
+      padding: 5px 12px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    #admin-header button:hover { background: rgba(255,255,255,0.25); }
+    .admin-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      max-width: 640px;
+      width: 100%;
+      margin: 0 auto;
+      box-sizing: border-box;
+    }
+    .admin-section {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .admin-section h2 {
+      margin: 0 0 14px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #888;
+    }
+    .admin-section-stub { opacity: 0.5; }
+    .coming-soon {
+      font-size: 11px;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+      color: #aaa;
+      background: #f0f0f0;
+      border-radius: 3px;
+      padding: 1px 6px;
+      margin-left: 6px;
+    }
+    .genus-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 8px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .genus-row:hover { background: #f5f5f5; }
+    .genus-row.swap-selected {
+      background: #eef6ee;
+      outline: 2px solid #2c7a2c;
+    }
+    .admin-colour-swatch {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      border: 1px solid rgba(0,0,0,0.12);
+    }
+    .genus-row-name { font-size: 14px; }
+    .genus-row-examples { font-style: italic; flex: 1; font-size: 13px; color: #777; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .genus-row-colour { font-size: 11px; color: #bbb; }
+    #swap-hint {
+      margin: 10px 0 0;
+      font-size: 12px;
+      color: #999;
+      min-height: 1.4em;
+    }
+    .admin-actions {
+      display: flex;
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid #f0f0f0;
+    }
+    .admin-actions button {
+      border-radius: 4px;
+      padding: 7px 16px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    #btn-reset-colours { background: none; border: 1px solid #ccc; color: #666; }
+    #btn-reset-colours:hover { background: #f5f5f5; }
+    @media (min-width: 900px) {
+      #admin-panel {
+        top: 0; right: 0; bottom: 0; left: 50%;
+        box-shadow: -4px 0 20px rgba(0,0,0,0.18);
+      }
+    }
+
     /* ── Map header (floating panel at top centre) ── */
     .map-header {
       position: absolute;
@@ -1291,6 +1409,40 @@
   // The "tree map" suffix is added by code; PARK_NAME is just the park's name.
   const APP_TITLE = `${PARK_NAME} tree map`;
 
+  const ADMIN_CONFIG_URL = `https://api.github.com/repos/${GITHUB_REPO}/contents/admin-config.json`;
+
+  // Mutable admin config — loaded at startup, updated on save.
+  let adminConfig = { genusHues: {} };
+
+  // 50 named colours, evenly spaced at ~7° intervals, all at hsl(hue, 62%, 48%).
+  const COLOUR_PALETTE = [
+    { name: 'Red',         hue:   0 }, { name: 'Scarlet',     hue:   7 },
+    { name: 'Vermillion',  hue:  14 }, { name: 'Persimmon',   hue:  22 },
+    { name: 'Orange-red',  hue:  29 }, { name: 'Orange',      hue:  36 },
+    { name: 'Tangerine',   hue:  43 }, { name: 'Amber',       hue:  50 },
+    { name: 'Gold',        hue:  58 }, { name: 'Goldenrod',   hue:  65 },
+    { name: 'Yellow',      hue:  72 }, { name: 'Lime-yellow', hue:  79 },
+    { name: 'Chartreuse',  hue:  86 }, { name: 'Yellow-green',hue:  94 },
+    { name: 'Grass green', hue: 101 }, { name: 'Fern',        hue: 108 },
+    { name: 'Leaf green',  hue: 115 }, { name: 'Green',       hue: 122 },
+    { name: 'Emerald',     hue: 130 }, { name: 'Jade',        hue: 137 },
+    { name: 'Mint',        hue: 144 }, { name: 'Sea green',   hue: 151 },
+    { name: 'Seafoam',     hue: 158 }, { name: 'Teal',        hue: 166 },
+    { name: 'Cyan',        hue: 173 }, { name: 'Aqua',        hue: 180 },
+    { name: 'Turquoise',   hue: 187 }, { name: 'Sky blue',    hue: 194 },
+    { name: 'Cerulean',    hue: 202 }, { name: 'Cornflower',  hue: 209 },
+    { name: 'Blue',        hue: 216 }, { name: 'Cobalt',      hue: 223 },
+    { name: 'Sapphire',    hue: 230 }, { name: 'Indigo',      hue: 238 },
+    { name: 'Violet',      hue: 245 }, { name: 'Purple',      hue: 252 },
+    { name: 'Plum',        hue: 259 }, { name: 'Lavender',    hue: 266 },
+    { name: 'Wisteria',    hue: 274 }, { name: 'Mauve',       hue: 281 },
+    { name: 'Magenta',     hue: 288 }, { name: 'Fuchsia',     hue: 295 },
+    { name: 'Pink',        hue: 302 }, { name: 'Hot pink',    hue: 310 },
+    { name: 'Deep rose',   hue: 317 }, { name: 'Rose',        hue: 324 },
+    { name: 'Crimson',     hue: 331 }, { name: 'Ruby',        hue: 338 },
+    { name: 'Carmine',     hue: 346 }, { name: 'Raspberry',   hue: 353 },
+  ];
+
   // Apply configured strings to the DOM.
   document.title = APP_TITLE;
   document.addEventListener('DOMContentLoaded', () => {
@@ -1430,7 +1582,7 @@
   // Species and cultivars within a genus get a lightness ramp of the same hue.
   // Hues are distributed evenly around the wheel with a 30° offset so the first
   // alphabetical genus doesn't always land on pure red.
-  function buildColourMap(trees) {
+  function buildColourMap(trees, hueOverrides = {}) {
     const allNames = [...new Set(trees.map(t => t['Scientific name']).filter(Boolean))].sort();
     const byGenus = {};
     for (const name of allNames) {
@@ -1441,7 +1593,9 @@
     const genera = Object.keys(byGenus).sort();
     const colourMap = new Map();
     genera.forEach((g, gi) => {
-      const hue = Math.round(((gi / Math.max(genera.length, 1)) * 360 + 30) % 360);
+      const hue = (hueOverrides[g] !== undefined)
+        ? hueOverrides[g]
+        : Math.round(((gi / Math.max(genera.length, 1)) * 360 + 30) % 360);
       const species = byGenus[g].sort();
       species.forEach((name, si) => {
         const n = species.length;
@@ -2136,6 +2290,7 @@
   );
   baseLayers['Street map'].addTo(map);
   L.control.layers(baseLayers, null, { position: 'bottomleft' }).addTo(map);
+  map.on('moveend', writeCachedView);
 
   // Map<treeObject, L.Marker>
   const markers = new Map();
@@ -2193,7 +2348,7 @@
         return !isNaN(lat) && !isNaN(lng);
       });
 
-    const colourMap = buildColourMap(trees);
+    const colourMap = buildColourMap(trees, adminConfig.genusHues || {});
     const bounds = [];
 
     for (const marker of markers.values()) map.removeLayer(marker);
@@ -2226,9 +2381,8 @@
 
     if (!silent) {
       if (bounds.length) {
-        map.fitBounds(bounds, { padding: [24, 24] });
+        if (!readCachedView()) map.fitBounds(bounds, { padding: [24, 24] });
         hideWelcomeOverlay();
-        writeCachedView();
       } else {
         map.setView(MAP_CENTER, MAP_ZOOM);
         showWelcomeOverlay();
@@ -2258,7 +2412,161 @@
     return trees;
   }
 
-  loadData();
+  // ── ADMIN CONFIG ─────────────────────────────────────────────────────────────
+  async function loadAdminConfig() {
+    try {
+      const resp = await fetch(ADMIN_CONFIG_URL, {
+        cache: 'no-cache',
+        headers: { Accept: 'application/vnd.github.raw+v1' }
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data && data.genusHues && typeof data.genusHues === 'object') {
+          adminConfig.genusHues = data.genusHues;
+        }
+      }
+    } catch (e) { /* 404 or network error — keep defaults */ }
+  }
+
+  let _adminOriginalHues = null;
+
+  function openAdminPanel() {
+    _adminOriginalHues = Object.assign({}, adminConfig.genusHues || {});
+    document.getElementById('admin-panel').style.display = 'flex';
+    document.getElementById('admin-park-name').textContent = PARK_NAME;
+    renderGenusColourList();
+  }
+
+  function exitAdminPanel() {
+    document.getElementById('admin-panel').style.display = 'none';
+    const p = new URLSearchParams(window.location.search);
+    p.delete('admin');
+    const q = p.toString();
+    window.history.replaceState({}, '', window.location.pathname + (q ? '?' + q : ''));
+  }
+
+  function cancelAdmin() {
+    adminConfig.genusHues = _adminOriginalHues || {};
+    _adminSwapGenus = null;
+    loadData({ silent: true });
+    exitAdminPanel();
+  }
+
+  function saveAndExitAdmin() {
+    saveAdminConfig();
+    exitAdminPanel();
+  }
+
+  let _adminSwapGenus = null;
+
+  function renderGenusColourList() {
+    const overrides = adminConfig.genusHues || {};
+    const allNames = [...new Set([...markers.keys()].map(t => t['Scientific name']).filter(Boolean))].sort();
+    const byGenus = {};
+    for (const name of allNames) {
+      const g = name.split(' ')[0];
+      if (!byGenus[g]) byGenus[g] = [];
+      byGenus[g].push(name);
+    }
+    const genusShortNames = {};
+    for (const tree of markers.keys()) {
+      const sci = (tree['Scientific name'] || '').trim();
+      const short = (tree['Short name'] || '').trim();
+      if (!sci || !short) continue;
+      const g = sci.split(' ')[0];
+      if (!genusShortNames[g]) genusShortNames[g] = new Set();
+      genusShortNames[g].add(short);
+    }
+    const genera = Object.keys(byGenus).sort();
+    const list = document.getElementById('genus-colour-list');
+    list.innerHTML = '';
+    if (!genera.length) {
+      list.innerHTML = '<p style="margin:0;color:#aaa;font-size:13px">No trees on the map yet.</p>';
+      document.getElementById('swap-hint').textContent = '';
+      return;
+    }
+    genera.forEach((g, gi) => {
+      const autoHue = Math.round(((gi / Math.max(genera.length, 1)) * 360 + 30) % 360);
+      const hue = overrides[g] !== undefined ? overrides[g] : autoHue;
+      const isOverride = overrides[g] !== undefined;
+      const shortNames = genusShortNames[g] ? [...genusShortNames[g]].slice(0, 2).join(', ') : '';
+      const row = document.createElement('div');
+      row.className = 'genus-row' + (_adminSwapGenus && _adminSwapGenus.genus === g ? ' swap-selected' : '');
+      row.dataset.genus = g;
+      row.dataset.hue = hue;
+      row.innerHTML =
+        `<span class="admin-colour-swatch" style="background:hsl(${hue},62%,48%)"></span>` +
+        `<span class="genus-row-name">${g}</span>` +
+        `<span class="genus-row-examples">${shortNames}</span>` +
+        `<span class="genus-row-colour">${isOverride ? '(swapped)' : '(auto)'}</span>`;
+      row.addEventListener('click', () => handleGenusRowClick(g));
+      list.appendChild(row);
+    });
+    const hint = document.getElementById('swap-hint');
+    hint.textContent = _adminSwapGenus
+      ? `Now click another genus to swap colours with ${_adminSwapGenus.genus}.`
+      : 'Click a genus to select it, then click another to swap their colours.';
+  }
+
+  function handleGenusRowClick(genus) {
+    const row = [...document.querySelectorAll('.genus-row')].find(r => r.dataset.genus === genus);
+    if (!row) return;
+    if (_adminSwapGenus === null) {
+      _adminSwapGenus = { genus, hue: parseInt(row.dataset.hue, 10) };
+      row.classList.add('swap-selected');
+      document.getElementById('swap-hint').textContent =
+        `Now click another genus to swap colours with ${genus}.`;
+    } else if (_adminSwapGenus.genus === genus) {
+      row.classList.remove('swap-selected');
+      _adminSwapGenus = null;
+      document.getElementById('swap-hint').textContent =
+        'Click a genus to select it, then click another to swap their colours.';
+    } else {
+      const hueB = parseInt(row.dataset.hue, 10);
+      if (!adminConfig.genusHues) adminConfig.genusHues = {};
+      adminConfig.genusHues[_adminSwapGenus.genus] = hueB;
+      adminConfig.genusHues[genus] = _adminSwapGenus.hue;
+      _adminSwapGenus = null;
+      renderGenusColourList();
+      loadData({ silent: true });
+    }
+  }
+
+  function resetColours() {
+    adminConfig.genusHues = {};
+    _adminSwapGenus = null;
+    renderGenusColourList();
+    loadData({ silent: true });
+    showToast('Reset to automatic — save to make permanent.');
+  }
+
+  function saveAdminConfig() {
+    fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action:  'saveAdminConfig',
+        token:   readContributorToken(),
+        config:  { version: 1, genusHues: adminConfig.genusHues || {} }
+      })
+    }).finally(() => {
+      showToast('Colours saved — visible to all viewers after reload.');
+    });
+  }
+
+  // Detect ?admin and initialise accordingly.
+  const _adminRequested = new URLSearchParams(window.location.search).has('admin');
+  if (_adminRequested && !canContribute()) {
+    const _p = new URLSearchParams(window.location.search);
+    _p.delete('admin');
+    const _q = _p.toString();
+    window.history.replaceState({}, '', window.location.pathname + (_q ? '?' + _q : ''));
+  }
+  loadAdminConfig().then(() => loadData()).then(() => {
+    if (_adminRequested && canContribute()) openAdminPanel();
+  });
+
   // Open panel by default on desktop only
   if (window.innerWidth > 767) {
     const panel  = document.getElementById('panel');
@@ -3490,5 +3798,29 @@
   }
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
   </script>
+
+  <div id="admin-panel">
+    <div id="admin-header">
+      <span>Admin — <span id="admin-park-name"></span></span>
+      <div style="display:flex;gap:8px">
+        <button onclick="cancelAdmin()">Cancel</button>
+        <button onclick="saveAndExitAdmin()" style="background:rgba(255,255,255,0.9);color:#2c3e50;font-weight:600">Save &amp; Exit</button>
+      </div>
+    </div>
+    <div class="admin-content">
+      <div class="admin-section">
+        <h2>Marker colours</h2>
+        <div id="genus-colour-list"></div>
+        <p id="swap-hint"></p>
+        <div class="admin-actions">
+          <button id="btn-reset-colours" onclick="resetColours()">Reset to automatic</button>
+        </div>
+      </div>
+      <div class="admin-section admin-section-stub">
+        <h2>Park info <span class="coming-soon">coming soon</span></h2>
+        <p style="margin:0;font-size:13px;color:#aaa">Edit park name, description and contact details without touching config.js.</p>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
