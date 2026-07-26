@@ -333,6 +333,7 @@ function handleEditTree(data) {
   set('Scientific name',   data.sci);
   set('Common name',       data.common);
   set('Short name',        data.short_name);
+  set('Other names',       data.other_names);
   set('Tags',              data.tags);
   set('Notes',             data.notes);
   set('Year planted',      data.year_planted);

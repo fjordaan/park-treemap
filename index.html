@@ -1204,6 +1204,7 @@
       <ul class="install-banner-reason" id="install-reason">
         <li>Removes the browser toolbar so the map fills the whole screen.</li>
         <li>You can get back to the map more easily in the future.</li>
+        <li>Opens external links in the app so it's easy to go back to the map.</li>
       </ul>
       <div class="install-banner-actions">
         <button class="install-banner-why" id="install-why">Why?</button>
@@ -1313,6 +1314,9 @@
         <textarea name="notes" rows="3" placeholder="Any observations…"></textarea>
       </label>
       <div id="edit-tree-extra-fields" style="display:none">
+        <label>Other names
+          <input name="other_names" type="text" placeholder="e.g. Common oak, Pedunculate oak">
+        </label>
         <div class="add-tree-year-row">
           <label>Year planted
             <input name="year_planted" type="text" inputmode="numeric" placeholder="e.g. 2021">
@@ -3337,6 +3341,7 @@
     form.elements['sci'].value          = tree['Scientific name']   || '';
     form.elements['common'].value       = tree['Common name']       || '';
     form.elements['short_name'].value   = tree['Short name']        || '';
+    form.elements['other_names'].value  = tree['Other names']       || '';
     form.elements['notes'].value        = tree['Notes']             || '';
     form.elements['year_planted'].value     = tree['Year planted']      || '';
     form.elements['est_year_planted'].value = tree['Est. year planted'] || '';
@@ -3462,6 +3467,7 @@
       sci:              form.elements['sci'].value.trim(),
       common:           form.elements['common'].value.trim(),
       short_name:       form.elements['short_name'].value.trim(),
+      other_names:      form.elements['other_names'].value.trim(),
       tags:             tagifyEditTags      ? tagifyEditTags.value.map(t => t.value).join(', ')          : '',
       notes:            form.elements['notes'].value.trim(),
       year_planted:     form.elements['year_planted'].value.trim(),
@@ -3486,6 +3492,7 @@
         tree['Scientific name']   = payload.sci;
         tree['Common name']       = payload.common;
         tree['Short name']        = payload.short_name;
+        tree['Other names']       = payload.other_names;
         tree['Tags']              = payload.tags;
         tree['Notes']             = payload.notes;
         tree['Year planted']      = payload.year_planted;
