@@ -79,6 +79,10 @@
       font-size: 12px;
       color: #555;
       font-weight: bold;
+      cursor: pointer;
+    }
+    #tree-count-number {
+      border-bottom: 1px dashed currentColor;
     }
     #filter-reset {
       font-size: 12px;
@@ -402,6 +406,67 @@
     .picker-option-hint {
       font-size: 12px; color: #666; line-height: 1.35;
     }
+
+    /* ── Refine tree count modal ─────────────────────────────────────────────── */
+    #tree-count-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 3000;
+      background: rgba(0,0,0,0.4);
+    }
+    #tree-count-backdrop.open { display: block; }
+    #tree-count-modal {
+      position: fixed;
+      z-index: 3001;
+      background: white;
+      padding: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+    }
+    @media (min-width: 768px) {
+      #tree-count-modal {
+        display: none;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        border-radius: 10px;
+        width: 340px;
+        max-height: 90vh;
+        overflow-y: auto;
+      }
+      #tree-count-modal.open { display: block; }
+    }
+    @media (max-width: 767px) {
+      #tree-count-modal {
+        bottom: 0; left: 0; right: 0;
+        border-radius: 14px 14px 0 0;
+        max-height: 85vh;
+        overflow-y: auto;
+        transform: translateY(100%);
+        transition: transform 0.3s ease;
+        padding-bottom: 28px;
+      }
+      #tree-count-modal.open { transform: translateY(0); }
+    }
+    #tree-count-handle {
+      width: 40px; height: 4px; background: #ddd; border-radius: 2px;
+      margin: 0 auto 16px;
+      display: none;
+    }
+    @media (max-width: 767px) { #tree-count-handle { display: block; } }
+    #tree-count-modal h3 { margin: 0 0 14px; font-size: 15px; color: #1a1a1a; }
+    .exclude-opt {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+      font-size: 13px;
+      color: #333;
+      cursor: pointer;
+      border-top: 1px solid #eee;
+    }
+    .exclude-opt:first-child { border-top: none; }
+    .tree-count-modal-actions { margin-top: 14px; text-align: right; }
 
     /* ── Install banner ──────────────────────────────────────────────────────── */
     .install-banner {
@@ -995,7 +1060,7 @@
   <div id="panel">
     <div id="panel-header">
       <span style="display:flex;align-items:center;gap:6px">
-        <span id="tree-count">Loading…</span>
+        <span id="tree-count" onclick="openTreeCountModal()">Loading…</span>
         <button id="filter-share" onclick="copyFilterLink()" title="Copy link to current filters">
           <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         </button>
@@ -1230,6 +1295,16 @@
     </form>
   </div>
 
+  <div id="tree-count-backdrop" onclick="closeTreeCountModal()"></div>
+  <div id="tree-count-modal">
+    <div id="tree-count-handle"></div>
+    <h3>Refine tree count (currently <span id="tree-count-modal-total">0</span>)</h3>
+    <div id="tree-count-options"></div>
+    <div class="tree-count-modal-actions">
+      <button type="button" class="btn-cancel-modal" onclick="closeTreeCountModal()">Done</button>
+    </div>
+  </div>
+
   <div id="lightbox" onclick="handleLightboxClick(event)">
     <div id="lightbox-grad-top"></div>
     <div id="lightbox-grad-bottom"></div>
@@ -1305,6 +1380,7 @@
     populateMapHeader();
     populateInfoModal();
     applyContributorGate();
+    buildTreeCountModal();
   });
 
   // Reflect contributor state into the DOM so CSS can hide gated controls.
@@ -1871,7 +1947,18 @@
     });
   }
 
-  function matchesFilters(tree) {
+  const EXCLUDE_OPTIONS = [
+    { key: 'deadCondition', label: 'Exclude Condition: Dead', match: t => tagKey(t['Condition']) === 'dead' },
+    { key: 'shrubForm',     label: 'Exclude Form: Shrub',     match: t => tagKey(t['Form']) === 'shrub' },
+    { key: 'bushForm',      label: 'Exclude Form: Bush',      match: t => tagKey(t['Form']) === 'bush' },
+    { key: 'hedgeForm',     label: 'Exclude Form: Hedge',     match: t => tagKey(t['Form']) === 'hedge' },
+  ];
+  const excludeFilters = { deadCondition: true, shrubForm: false, bushForm: false, hedgeForm: false };
+  try {
+    Object.assign(excludeFilters, JSON.parse(localStorage.getItem('park-treemap-exclude-filters') || '{}'));
+  } catch (e) {}
+
+  function matchesFilters(tree, skipExcludeKey) {
     const sciFilter    = document.getElementById('filter-sci').value;
     const commonFilter = document.getElementById('filter-common').value;
     const shortFilter  = document.getElementById('filter-short').value;
@@ -1903,6 +1990,7 @@
       const months = (tree['Months (Seasonal interest)'] || '').split(',').map(m => m.trim());
       if (!months.includes(selectedMonth)) return false;
     }
+    if (EXCLUDE_OPTIONS.some(opt => opt.key !== skipExcludeKey && excludeFilters[opt.key] && opt.match(tree))) return false;
     return true;
   }
 
@@ -1919,8 +2007,9 @@
         if (tooltip && tooltip.isOpen()) marker.closeTooltip();
       }
     });
-    document.getElementById('tree-count').textContent =
-      `${count} tree${count !== 1 ? 's' : ''} shown`;
+    document.getElementById('tree-count').innerHTML =
+      `<span id="tree-count-number">${count}</span> tree${count !== 1 ? 's' : ''} shown`;
+    if (document.getElementById('tree-count-modal')?.classList.contains('open')) updateTreeCountModal();
     updateLabels();
   }
 
@@ -2039,6 +2128,52 @@
     applyFilters();
   }
 
+
+  function buildTreeCountModal() {
+    const container = document.getElementById('tree-count-options');
+    EXCLUDE_OPTIONS.forEach(opt => {
+      const row = document.createElement('label');
+      row.className = 'exclude-opt';
+      row.innerHTML =
+        `<input type="checkbox" id="exclude-opt-${opt.key}"${excludeFilters[opt.key] ? ' checked' : ''}>` +
+        `<span id="exclude-text-${opt.key}"></span>`;
+      row.querySelector('input').onchange = (e) => {
+        excludeFilters[opt.key] = e.target.checked;
+        localStorage.setItem('park-treemap-exclude-filters', JSON.stringify(excludeFilters));
+        applyFilters();
+      };
+      container.appendChild(row);
+    });
+  }
+
+  function updateTreeCountModal() {
+    document.getElementById('tree-count-modal-total').textContent =
+      document.getElementById('tree-count-number')?.textContent ?? '0';
+    EXCLUDE_OPTIONS.forEach(opt => {
+      const otherTrees = [];
+      markers.forEach((marker, tree) => { if (matchesFilters(tree, opt.key)) otherTrees.push(tree); });
+      const x = otherTrees.filter(opt.match).length;
+      const textEl = document.getElementById(`exclude-text-${opt.key}`);
+      if (excludeFilters[opt.key]) {
+        textEl.textContent = `${opt.label} (${x})`;
+      } else {
+        const y = otherTrees.length - x;
+        textEl.textContent = `${opt.label} (${x}): ${y}`;
+      }
+    });
+  }
+
+  function openTreeCountModal() {
+    if (!markers.size) return;
+    document.getElementById('tree-count-backdrop').classList.add('open');
+    document.getElementById('tree-count-modal').classList.add('open');
+    updateTreeCountModal();
+  }
+
+  function closeTreeCountModal() {
+    document.getElementById('tree-count-backdrop').classList.remove('open');
+    document.getElementById('tree-count-modal').classList.remove('open');
+  }
 
   function togglePanel() {
     const panel  = document.getElementById('panel');
@@ -2257,8 +2392,7 @@
       }
     }
 
-    document.getElementById('tree-count').textContent =
-      `${trees.length} tree${trees.length !== 1 ? 's' : ''} shown`;
+    if (!silent) applyFilters();
     return trees;
   }
 
