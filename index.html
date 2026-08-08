@@ -568,6 +568,21 @@
       line-height: 1.3;
     }
     .tree-label::before { display: none; }
+    .park-label {
+      background: #2d6a2d;
+      border: none;
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 3px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+      white-space: nowrap;
+    }
+    .park-label::before { display: none; }
+    .park-popup { font-size: 13px; }
+    .park-popup b { display: block; margin-bottom: 4px; }
+    .park-popup a { color: #2a7ae2; }
 
     .section-label {
       background: none;
@@ -2296,6 +2311,9 @@
   // Map<treeObject, L.Marker>
   const markers = new Map();
 
+  const parkMarkerLayer = L.layerGroup();
+  const PARK_ZOOM_THRESHOLD = 13; // park markers visible below this zoom level
+
   let pendingAddMarker = null; // temporary marker shown after add-tree submission
   let tagifyInstance   = null;
   let tagifyFormField  = null;
@@ -2412,6 +2430,44 @@
     if (!silent) applyFilters();
     return trees;
   }
+
+  // ── NEARBY PARKS ─────────────────────────────────────────────────────────────
+  function updateParkMarkersVisibility() {
+    if (map.getZoom() < PARK_ZOOM_THRESHOLD) {
+      if (!map.hasLayer(parkMarkerLayer)) parkMarkerLayer.addTo(map);
+    } else {
+      if (map.hasLayer(parkMarkerLayer)) parkMarkerLayer.remove();
+    }
+  }
+
+  function buildParkMarkers(parks) {
+    const currentUrl = (window.location.origin + window.location.pathname).replace(/\/+$/, '/');
+    parks.forEach(park => {
+      if (!park.lat || !park.lng || !park.url || !park.name) return;
+      if (park.url.replace(/\/+$/, '/') === currentUrl) return;
+      const marker = L.circleMarker([park.lat, park.lng], {
+        radius: 9, fillColor: '#2d6a2d', color: 'white', weight: 2, fillOpacity: 0.9
+      });
+      marker.bindTooltip(park.name, { permanent: true, direction: 'right', className: 'park-label', offset: [8, 0] });
+      marker.bindPopup(
+        `<div class="park-popup"><b>${esc(park.name)}</b><a href="${esc(park.url)}" target="_blank" rel="noopener">Open map ↗</a></div>`
+      );
+      parkMarkerLayer.addLayer(marker);
+    });
+  }
+
+  async function loadParkRegistry() {
+    try {
+      const resp = await fetch('https://raw.githubusercontent.com/fjordaan/park-treemap/main/registry.json');
+      if (!resp.ok) return;
+      const parks = await resp.json();
+      buildParkMarkers(parks);
+      updateParkMarkersVisibility();
+    } catch (e) {}
+  }
+
+  map.on('zoomend', updateParkMarkersVisibility);
+  loadParkRegistry();
 
   loadData();
   // Open panel by default on desktop only
