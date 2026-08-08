@@ -578,6 +578,8 @@
       border-radius: 3px;
       box-shadow: 0 1px 4px rgba(0,0,0,0.3);
       white-space: nowrap;
+      pointer-events: auto;
+      cursor: pointer;
     }
     .park-label::before { display: none; }
     .park-popup { font-size: 13px; }
@@ -2449,6 +2451,7 @@
         radius: 9, fillColor: '#2d6a2d', color: 'white', weight: 2, fillOpacity: 0.9
       });
       marker.bindTooltip(park.name, { permanent: true, direction: 'right', className: 'park-label', offset: [8, 0] });
+      marker.on('tooltipopen', e => L.DomEvent.on(e.tooltip.getElement(), 'click', () => marker.openPopup()));
       marker.bindPopup(
         `<div class="park-popup"><b>${esc(park.name)}</b><a href="${esc(park.url)}" target="_blank" rel="noopener">Open map ↗</a></div>`
       );
