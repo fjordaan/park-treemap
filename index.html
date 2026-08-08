@@ -568,6 +568,21 @@
       line-height: 1.3;
     }
     .tree-label::before { display: none; }
+    .park-label {
+      background: #2d6a2d;
+      border: none;
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 3px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+      white-space: nowrap;
+    }
+    .park-label::before { display: none; }
+    .park-popup { font-size: 13px; }
+    .park-popup b { display: block; margin-bottom: 4px; }
+    .park-popup a { color: #2a7ae2; }
 
     .section-label {
       background: none;
@@ -2451,6 +2466,9 @@
   // Map<treeObject, L.Marker>
   const markers = new Map();
 
+  const parkMarkerLayer = L.layerGroup();
+  const PARK_ZOOM_THRESHOLD = 13; // park markers visible below this zoom level
+
   let pendingAddMarker = null; // temporary marker shown after add-tree submission
   let tagifyInstance   = null;
   let tagifyFormField  = null;
@@ -2567,161 +2585,45 @@
     return trees;
   }
 
-  // ── ADMIN CONFIG ─────────────────────────────────────────────────────────────
-  async function loadAdminConfig() {
-    try {
-      const resp = await fetch(ADMIN_CONFIG_URL, {
-        cache: 'no-cache',
-        headers: { Accept: 'application/vnd.github.raw+v1' }
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data && data.genusHues && typeof data.genusHues === 'object') {
-          adminConfig.genusHues = data.genusHues;
-        }
-      }
-    } catch (e) { /* 404 or network error — keep defaults */ }
-  }
-
-  let _adminOriginalHues = null;
-
-  function openAdminPanel() {
-    _adminOriginalHues = Object.assign({}, adminConfig.genusHues || {});
-    document.getElementById('admin-panel').style.display = 'flex';
-    document.getElementById('admin-park-name').textContent = PARK_NAME;
-    renderGenusColourList();
-  }
-
-  function exitAdminPanel() {
-    document.getElementById('admin-panel').style.display = 'none';
-    const p = new URLSearchParams(window.location.search);
-    p.delete('admin');
-    const q = p.toString();
-    window.history.replaceState({}, '', window.location.pathname + (q ? '?' + q : ''));
-  }
-
-  function cancelAdmin() {
-    adminConfig.genusHues = _adminOriginalHues || {};
-    _adminSwapGenus = null;
-    loadData({ silent: true });
-    exitAdminPanel();
-  }
-
-  function saveAndExitAdmin() {
-    saveAdminConfig();
-    exitAdminPanel();
-  }
-
-  let _adminSwapGenus = null;
-
-  function renderGenusColourList() {
-    const overrides = adminConfig.genusHues || {};
-    const allNames = [...new Set([...markers.keys()].map(t => t['Scientific name']).filter(Boolean))].sort();
-    const byGenus = {};
-    for (const name of allNames) {
-      const g = name.split(' ')[0];
-      if (!byGenus[g]) byGenus[g] = [];
-      byGenus[g].push(name);
-    }
-    const genusShortNames = {};
-    for (const tree of markers.keys()) {
-      const sci = (tree['Scientific name'] || '').trim();
-      const short = (tree['Short name'] || '').trim();
-      if (!sci || !short) continue;
-      const g = sci.split(' ')[0];
-      if (!genusShortNames[g]) genusShortNames[g] = new Set();
-      genusShortNames[g].add(short);
-    }
-    const genera = Object.keys(byGenus).sort();
-    const list = document.getElementById('genus-colour-list');
-    list.innerHTML = '';
-    if (!genera.length) {
-      list.innerHTML = '<p style="margin:0;color:#aaa;font-size:13px">No trees on the map yet.</p>';
-      document.getElementById('swap-hint').textContent = '';
-      return;
-    }
-    genera.forEach((g, gi) => {
-      const autoHue = Math.round(((gi / Math.max(genera.length, 1)) * 360 + 30) % 360);
-      const hue = overrides[g] !== undefined ? overrides[g] : autoHue;
-      const isOverride = overrides[g] !== undefined;
-      const shortNames = genusShortNames[g] ? [...genusShortNames[g]].slice(0, 2).join(', ') : '';
-      const row = document.createElement('div');
-      row.className = 'genus-row' + (_adminSwapGenus && _adminSwapGenus.genus === g ? ' swap-selected' : '');
-      row.dataset.genus = g;
-      row.dataset.hue = hue;
-      row.innerHTML =
-        `<span class="admin-colour-swatch" style="background:hsl(${hue},62%,48%)"></span>` +
-        `<span class="genus-row-name">${g}</span>` +
-        `<span class="genus-row-examples">${shortNames}</span>` +
-        `<span class="genus-row-colour">${isOverride ? '(swapped)' : '(auto)'}</span>`;
-      row.addEventListener('click', () => handleGenusRowClick(g));
-      list.appendChild(row);
-    });
-    const hint = document.getElementById('swap-hint');
-    hint.textContent = _adminSwapGenus
-      ? `Now click another genus to swap colours with ${_adminSwapGenus.genus}.`
-      : 'Click a genus to select it, then click another to swap their colours.';
-  }
-
-  function handleGenusRowClick(genus) {
-    const row = [...document.querySelectorAll('.genus-row')].find(r => r.dataset.genus === genus);
-    if (!row) return;
-    if (_adminSwapGenus === null) {
-      _adminSwapGenus = { genus, hue: parseInt(row.dataset.hue, 10) };
-      row.classList.add('swap-selected');
-      document.getElementById('swap-hint').textContent =
-        `Now click another genus to swap colours with ${genus}.`;
-    } else if (_adminSwapGenus.genus === genus) {
-      row.classList.remove('swap-selected');
-      _adminSwapGenus = null;
-      document.getElementById('swap-hint').textContent =
-        'Click a genus to select it, then click another to swap their colours.';
+  // ── NEARBY PARKS ─────────────────────────────────────────────────────────────
+  function updateParkMarkersVisibility() {
+    if (map.getZoom() < PARK_ZOOM_THRESHOLD) {
+      if (!map.hasLayer(parkMarkerLayer)) parkMarkerLayer.addTo(map);
     } else {
-      const hueB = parseInt(row.dataset.hue, 10);
-      if (!adminConfig.genusHues) adminConfig.genusHues = {};
-      adminConfig.genusHues[_adminSwapGenus.genus] = hueB;
-      adminConfig.genusHues[genus] = _adminSwapGenus.hue;
-      _adminSwapGenus = null;
-      renderGenusColourList();
-      loadData({ silent: true });
+      if (map.hasLayer(parkMarkerLayer)) parkMarkerLayer.remove();
     }
   }
 
-  function resetColours() {
-    adminConfig.genusHues = {};
-    _adminSwapGenus = null;
-    renderGenusColourList();
-    loadData({ silent: true });
-    showToast('Reset to automatic — save to make permanent.');
-  }
-
-  function saveAdminConfig() {
-    fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({
-        action:  'saveAdminConfig',
-        token:   readContributorToken(),
-        config:  { version: 1, genusHues: adminConfig.genusHues || {} }
-      })
-    }).finally(() => {
-      showToast('Colours saved — visible to all viewers after reload.');
+  function buildParkMarkers(parks) {
+    const currentUrl = (window.location.origin + window.location.pathname).replace(/\/+$/, '/');
+    parks.forEach(park => {
+      if (!park.lat || !park.lng || !park.url || !park.name) return;
+      if (park.url.replace(/\/+$/, '/') === currentUrl) return;
+      const marker = L.circleMarker([park.lat, park.lng], {
+        radius: 9, fillColor: '#2d6a2d', color: 'white', weight: 2, fillOpacity: 0.9
+      });
+      marker.bindTooltip(park.name, { permanent: true, direction: 'right', className: 'park-label', offset: [8, 0] });
+      marker.bindPopup(
+        `<div class="park-popup"><b>${esc(park.name)}</b><a href="${esc(park.url)}" target="_blank" rel="noopener">Open map ↗</a></div>`
+      );
+      parkMarkerLayer.addLayer(marker);
     });
   }
 
-  // Detect ?admin and initialise accordingly.
-  const _adminRequested = new URLSearchParams(window.location.search).has('admin');
-  if (_adminRequested && !canContribute()) {
-    const _p = new URLSearchParams(window.location.search);
-    _p.delete('admin');
-    const _q = _p.toString();
-    window.history.replaceState({}, '', window.location.pathname + (_q ? '?' + _q : ''));
+  async function loadParkRegistry() {
+    try {
+      const resp = await fetch('https://raw.githubusercontent.com/fjordaan/park-treemap/main/registry.json');
+      if (!resp.ok) return;
+      const parks = await resp.json();
+      buildParkMarkers(parks);
+      updateParkMarkersVisibility();
+    } catch (e) {}
   }
-  loadAdminConfig().then(() => loadData()).then(() => {
-    if (_adminRequested && canContribute()) openAdminPanel();
-  });
 
+  map.on('zoomend', updateParkMarkersVisibility);
+  loadParkRegistry();
+
+  loadData();
   // Open panel by default on desktop only
   if (window.innerWidth > 767) {
     const panel  = document.getElementById('panel');
