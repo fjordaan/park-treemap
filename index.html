@@ -845,6 +845,19 @@
     }
     #lightbox.loading #lightbox-spinner { display: block; }
     #lightbox.loading #lightbox-img { opacity: 0; }
+    #lightbox-date {
+      position: fixed;
+      bottom: 60px;
+      left: 12px;
+      color: white;
+      font-size: 12px;
+      background: rgba(0,0,0,0.45);
+      padding: 3px 8px;
+      border-radius: 4px;
+      pointer-events: none;
+      display: none;
+    }
+    #lightbox-date.visible { display: block; }
     @keyframes lb-spin { to { transform: rotate(360deg); } }
 
     /* ── Admin panel ─────────────────────────────────────────────────────── */
@@ -1430,6 +1443,7 @@
     <button id="lightbox-close-top" onclick="closeLightbox()">&#x2715;</button>
     <div id="lightbox-zoom-hint">Click or tap photo to zoom</div>
     <div id="lightbox-spinner"></div>
+    <div id="lightbox-date"></div>
     <img id="lightbox-img" src="" referrerpolicy="no-referrer" alt="Tree photo" draggable="false" onclick="toggleLightboxZoom(event)"
          onload="document.getElementById('lightbox').classList.remove('loading')"
          onerror="document.getElementById('lightbox').classList.remove('loading')"/>
@@ -1444,6 +1458,8 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.js"></script>
   <!--
     Configuration lives in config.js — the only file you need to edit when
     setting up your map. Keeping it out of index.html means future improvements
@@ -2763,6 +2779,21 @@
     lbResetZoom();
     document.getElementById('lightbox').classList.add('loading');
     img.src = large;
+    const dateEl = document.getElementById('lightbox-date');
+    dateEl.classList.remove('visible');
+    if (large.includes('raw.githubusercontent.com')) {
+      const capturedIndex = lbIndex;
+      (async () => {
+        try {
+          const meta = await exifr.parse(large, ['DateTimeOriginal']);
+          if (lbIndex !== capturedIndex) return;
+          if (meta?.DateTimeOriginal instanceof Date) {
+            dateEl.textContent = formatPhotoDate(meta.DateTimeOriginal);
+            dateEl.classList.add('visible');
+          }
+        } catch (e) {}
+      })();
+    }
     document.getElementById('lightbox-open').href = raw;
     document.getElementById('lightbox-prev').disabled = lbIndex === 0;
     document.getElementById('lightbox-next').disabled = lbIndex === lbPhotos.length - 1;
@@ -2856,6 +2887,7 @@
     lbResetZoom();
     document.getElementById('lightbox').classList.remove('open');
     document.getElementById('lightbox-img').src = '';
+    document.getElementById('lightbox-date').classList.remove('visible');
   }
 
   function handleLightboxClick(e) {
@@ -3360,7 +3392,23 @@
     });
   }
 
-  async function compressImage(file) {
+  async function compressImage(file, treeLat, treeLng) {
+    // Read EXIF before canvas strips it.
+    let dateTimeOriginal = null, gpsLat = null, gpsLng = null;
+    try {
+      const [meta, gps] = await Promise.all([
+        exifr.parse(file, ['DateTimeOriginal']),
+        exifr.gps(file)
+      ]);
+      dateTimeOriginal = (meta?.DateTimeOriginal instanceof Date) ? meta.DateTimeOriginal : null;
+      if (gps) { gpsLat = gps.latitude; gpsLng = gps.longitude; }
+    } catch (e) {}
+    // Fall back to tree coordinates if the photo has no GPS.
+    if (gpsLat === null && treeLat != null && !isNaN(parseFloat(treeLat))) {
+      gpsLat = parseFloat(treeLat);
+      gpsLng = parseFloat(treeLng);
+    }
+
     // Resize + re-orient via createImageBitmap (respects EXIF orientation on
     // modern browsers) and re-encode as JPEG to keep the repo lean.
     const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
@@ -3371,9 +3419,50 @@
     canvas.width = w; canvas.height = h;
     canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
     bitmap.close();
-    const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+    let dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+
+    // Inject EXIF back into the output JPEG.
+    try {
+      const exifObj = { '0th': {}, 'Exif': {}, 'GPS': {} };
+      if (dateTimeOriginal) {
+        const dt = formatExifDate(dateTimeOriginal);
+        exifObj['Exif'][piexif.ExifIFD.DateTimeOriginal] = dt;
+        exifObj['0th'][piexif.ImageIFD.DateTime] = dt;
+      }
+      if (gpsLat !== null && gpsLng !== null) {
+        exifObj['GPS'][piexif.GPSIFD.GPSLatitudeRef]  = gpsLat >= 0 ? 'N' : 'S';
+        exifObj['GPS'][piexif.GPSIFD.GPSLatitude]     = decimalToDMS(Math.abs(gpsLat));
+        exifObj['GPS'][piexif.GPSIFD.GPSLongitudeRef] = gpsLng >= 0 ? 'E' : 'W';
+        exifObj['GPS'][piexif.GPSIFD.GPSLongitude]    = decimalToDMS(Math.abs(gpsLng));
+      }
+      if (dateTimeOriginal || gpsLat !== null) {
+        dataUrl = piexif.insert(piexif.dump(exifObj), dataUrl);
+      }
+    } catch (e) {
+      console.warn('EXIF write failed:', e);
+    }
+
     const base64 = dataUrl.split(',')[1];
     return { dataUrl, base64 };
+  }
+
+  function formatExifDate(date) {
+    const pad = n => String(n).padStart(2, '0');
+    return `${date.getFullYear()}:${pad(date.getMonth()+1)}:${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  }
+
+  function decimalToDMS(decimal) {
+    const deg = Math.floor(decimal);
+    const minFloat = (decimal - deg) * 60;
+    const min = Math.floor(minFloat);
+    const sec = Math.round((minFloat - min) * 60 * 100);
+    return [[deg, 1], [min, 1], [sec, 100]];
+  }
+
+  function formatPhotoDate(date) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const pad = n => String(n).padStart(2, '0');
+    return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}, ${pad(date.getHours())}:${pad(date.getMinutes())}`;
   }
 
   async function handlePhotoFiles(fileList) {
@@ -3381,7 +3470,9 @@
     for (const file of files) {
       if (pendingPhotos.length >= MAX_PHOTOS) break;
       try {
-        const { dataUrl, base64 } = await compressImage(file);
+        const lat = document.getElementById('add-tree-lat').value;
+        const lng = document.getElementById('add-tree-lng').value;
+        const { dataUrl, base64 } = await compressImage(file, lat, lng);
         pendingPhotos.push({ base64, dataUrl });
       } catch (err) {
         console.warn('Failed to process photo:', err);
@@ -3711,7 +3802,7 @@
     for (let i = 0; i < accepted.length; i++) {
       setPopupStatus(`Uploading photo ${i + 1} of ${accepted.length}…`, true);
       try {
-        const { base64 } = await compressImage(accepted[i]);
+        const { base64 } = await compressImage(accepted[i], tree['Latitude'], tree['Longitude']);
         const filename = `${tok}-${i + 1}.jpg`;
         await uploadPhotoToScript(filename, base64);
         newPaths.push(`photos/${filename}`);
