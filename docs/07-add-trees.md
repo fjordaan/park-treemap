@@ -161,3 +161,9 @@ the map as grey squares so you can track losses over time.
 - If a photo upload fails (network drop, expired token, etc.), the form
   continues and submits the tree without that photo. You can re-upload later
   by editing the spreadsheet's `Photos` cell directly.
+- **Date and location are preserved.** The upload process reads the photo's
+  original date/time and GPS coordinates (if present) and writes them back
+  into the stored JPEG, so the file remains useful if saved or shared
+  independently. If the photo has no GPS tag, the tree's own coordinates are
+  used as a fallback. When you open a photo full-screen, the date it was taken
+  is shown as an overlay in the bottom-left corner.
