@@ -1998,10 +1998,14 @@
   }
 
   const EXCLUDE_OPTIONS = [
-    { key: 'deadCondition', label: 'Exclude Condition: Dead', match: t => tagKey(t['Condition']) === 'dead' },
-    { key: 'shrubForm',     label: 'Exclude Form: Shrub',     match: t => tagKey(t['Form']) === 'shrub' },
-    { key: 'bushForm',      label: 'Exclude Form: Bush',      match: t => tagKey(t['Form']) === 'bush' },
-    { key: 'hedgeForm',     label: 'Exclude Form: Hedge',     match: t => tagKey(t['Form']) === 'hedge' },
+    { key: 'deadCondition', label: 'Exclude Condition: Dead', match: t => tagKey(t['Condition']) === 'dead',
+      conflictsWhen: () => [...document.querySelectorAll('.filter-condition:checked')].some(cb => tagKey(cb.value) === 'dead') },
+    { key: 'shrubForm',     label: 'Exclude Form: Shrub',     match: t => tagKey(t['Form']) === 'shrub',
+      conflictsWhen: () => [...document.querySelectorAll('.filter-form:checked')].some(cb => tagKey(cb.value) === 'shrub') },
+    { key: 'bushForm',      label: 'Exclude Form: Bush',      match: t => tagKey(t['Form']) === 'bush',
+      conflictsWhen: () => [...document.querySelectorAll('.filter-form:checked')].some(cb => tagKey(cb.value) === 'bush') },
+    { key: 'hedgeForm',     label: 'Exclude Form: Hedge',     match: t => tagKey(t['Form']) === 'hedge',
+      conflictsWhen: () => [...document.querySelectorAll('.filter-form:checked')].some(cb => tagKey(cb.value) === 'hedge') },
   ];
   const excludeFilters = { deadCondition: true, shrubForm: false, bushForm: false, hedgeForm: false };
   try {
@@ -2044,6 +2048,16 @@
   }
 
   function applyFilters() {
+    let excludeChanged = false;
+    EXCLUDE_OPTIONS.forEach(opt => {
+      if (excludeFilters[opt.key] && opt.conflictsWhen?.()) {
+        excludeFilters[opt.key] = false;
+        const cb = document.getElementById(`exclude-opt-${opt.key}`);
+        if (cb) cb.checked = false;
+        excludeChanged = true;
+      }
+    });
+    if (excludeChanged) localStorage.setItem('park-treemap-exclude-filters', JSON.stringify(excludeFilters));
     let count = 0;
     markers.forEach((marker, tree) => {
       const show = matchesFilters(tree);
