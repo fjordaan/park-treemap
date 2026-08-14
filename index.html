@@ -584,6 +584,7 @@
       flex-shrink: 0;
     }
     .park-marker-label {
+      display: none;
       background: #2d6a2d;
       color: white;
       font-size: 11px;
@@ -592,6 +593,10 @@
       border-radius: 3px;
       box-shadow: 0 1px 4px rgba(0,0,0,0.3);
       margin-left: 4px;
+    }
+    #map.park-labels-visible .park-marker-label { display: block; }
+    @media (hover: hover) {
+      .park-marker-wrap:hover .park-marker-label { display: block; }
     }
     .park-popup { font-size: 13px; }
     .park-popup b { display: block; margin-bottom: 4px; }
@@ -2325,7 +2330,8 @@
   const markers = new Map();
 
   const parkMarkerLayer = L.layerGroup();
-  const PARK_ZOOM_THRESHOLD = 19; // park markers visible below this zoom level
+  const PARK_ZOOM_THRESHOLD = 19;  // dot visible below this zoom level
+  const PARK_LABEL_THRESHOLD = 18; // label visible below this zoom level (zoom 17 and below)
 
   let pendingAddMarker = null; // temporary marker shown after add-tree submission
   let tagifyInstance   = null;
@@ -2446,11 +2452,13 @@
 
   // ── NEARBY PARKS ─────────────────────────────────────────────────────────────
   function updateParkMarkersVisibility() {
-    if (map.getZoom() < PARK_ZOOM_THRESHOLD) {
+    const zoom = map.getZoom();
+    if (zoom < PARK_ZOOM_THRESHOLD) {
       if (!map.hasLayer(parkMarkerLayer)) parkMarkerLayer.addTo(map);
     } else {
       if (map.hasLayer(parkMarkerLayer)) parkMarkerLayer.remove();
     }
+    map.getContainer().classList.toggle('park-labels-visible', zoom < PARK_LABEL_THRESHOLD);
   }
 
   function buildParkMarkers(parks) {
