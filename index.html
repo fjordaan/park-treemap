@@ -2008,7 +2008,7 @@
     Object.assign(excludeFilters, JSON.parse(localStorage.getItem('park-treemap-exclude-filters') || '{}'));
   } catch (e) {}
 
-  function matchesFilters(tree, skipExcludeKey) {
+  function matchesFilters(tree) {
     const sciFilter    = document.getElementById('filter-sci').value;
     const commonFilter = document.getElementById('filter-common').value;
     const shortFilter  = document.getElementById('filter-short').value;
@@ -2040,7 +2040,6 @@
       const months = (tree['Months (Seasonal interest)'] || '').split(',').map(m => m.trim());
       if (!months.includes(selectedMonth)) return false;
     }
-    if (EXCLUDE_OPTIONS.some(opt => opt.key !== skipExcludeKey && excludeFilters[opt.key] && opt.match(tree))) return false;
     return true;
   }
 
@@ -2050,7 +2049,7 @@
       const show = matchesFilters(tree);
       if (show) {
         if (!map.hasLayer(marker)) marker.addTo(map);
-        count++;
+        if (!EXCLUDE_OPTIONS.some(opt => excludeFilters[opt.key] && opt.match(tree))) count++;
       } else {
         if (map.hasLayer(marker)) marker.remove();
         const tooltip = marker.getTooltip();
@@ -2201,7 +2200,11 @@
       document.getElementById('tree-count-number')?.textContent ?? '0';
     EXCLUDE_OPTIONS.forEach(opt => {
       const otherTrees = [];
-      markers.forEach((marker, tree) => { if (matchesFilters(tree, opt.key)) otherTrees.push(tree); });
+      markers.forEach((marker, tree) => {
+        if (!matchesFilters(tree)) return;
+        if (EXCLUDE_OPTIONS.some(o => o.key !== opt.key && excludeFilters[o.key] && o.match(tree))) return;
+        otherTrees.push(tree);
+      });
       const x = otherTrees.filter(opt.match).length;
       const textEl = document.getElementById(`exclude-text-${opt.key}`);
       if (excludeFilters[opt.key]) {
