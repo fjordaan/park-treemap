@@ -193,8 +193,18 @@
     #add-tree-coords-display { font-size: 11px; font-weight: 400; color: #999; }
     .tree-form label { display: block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 10px; }
     .tree-form label .field-hint { display: block; font-weight: 400; font-size: 11px; color: #888; margin-bottom: 2px; }
-    .sci-name-help-toggle { display: inline-block; font-size: 12px; font-weight: 500; color: #5a9e7a; cursor: pointer; margin-top: 5px; user-select: none; }
+    .sci-name-help-wrap { margin-top: 2px; margin-bottom: 12px; }
+    .sci-name-help-toggle {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: none; border: none; padding: 0;
+      font-size: 12px; font-weight: 500; color: #5a9e7a; cursor: pointer; user-select: none;
+    }
     .sci-name-help-toggle:hover { text-decoration: underline; }
+    .sci-name-help-arrow {
+      display: inline-block; font-size: 9px;
+      transition: transform 0.2s ease;
+    }
+    .sci-name-help-toggle.open .sci-name-help-arrow { transform: rotate(90deg); }
     .sci-name-help-panel {
       display: none; margin-top: 8px;
       background: #eef7f2; border-left: 3px solid #5a9e7a; border-radius: 4px;
@@ -1361,9 +1371,13 @@
         <input name="sci" type="text" list="add-tree-sci-list" placeholder="e.g. Quercus robur" autocomplete="off">
         <datalist id="add-tree-sci-list"></datalist>
       </label>
-      <span class="sci-name-help-toggle" onclick="this.nextElementSibling.classList.toggle('open')">Unsure?</span>
-      <div class="sci-name-help-panel">
-        It's OK to put in a rough guess — you can always edit it later. Add <em>sp.</em> after the genus if you know the family but not the species, e.g. <em>Quercus sp.</em> for a type of oak. Add the <code>TBC</code> tag, which will give it a special marker reminding you to identify it.
+      <div class="sci-name-help-wrap">
+        <button type="button" class="sci-name-help-toggle" onclick="this.classList.toggle('open'); this.nextElementSibling.classList.toggle('open')">
+          <span class="sci-name-help-arrow">▶</span>Unsure?
+        </button>
+        <div class="sci-name-help-panel">
+          It's OK to put in a rough guess — you can always edit it later. Add <em>sp.</em> after the genus if you know the family but not the species, e.g. <em>Quercus sp.</em> for a type of oak. Add the <code>TBC</code> tag, which will give it a special marker reminding you to identify it.
+        </div>
       </div>
       <label>Common name
         <input name="common" type="text" placeholder="e.g. English oak">
