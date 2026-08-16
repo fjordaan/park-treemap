@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hero banner variants</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #e8e8e8;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 7rem;
+    }
+
+    h1 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 0.5rem;
+    }
+
+    /* ── CONTROLS ── */
+    .controls {
+      background: white;
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      align-items: center;
+      font-size: 0.85rem;
+    }
+    .controls label { display: flex; flex-direction: column; gap: 0.3rem; color: #444; font-weight: 500; }
+    .controls input[type=range] { width: 160px; }
+    .controls select { padding: 0.2rem 0.4rem; border: 1px solid #ccc; border-radius: 4px; }
+    .controls output { font-variant-numeric: tabular-nums; color: #888; }
+
+    /* ── VARIANT WRAPPER ── */
+    .variant { display: flex; flex-direction: column; gap: 0.4rem; }
+    .variant-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #555;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    /* ── HERO OUTER — hand is positioned relative to this, can overflow above ── */
+    .hero-outer {
+      position: relative;
+    }
+
+    /* ── HERO — overflow:hidden clips background + overlay to border-radius ── */
+    .hero {
+      position: relative;
+      height: var(--hero-height, 440px);
+      overflow: hidden;
+      background: #1e4d1e center / cover no-repeat;
+      border-radius: 8px;
+    }
+
+    /* gradient overlay — left-heavy so text stays legible */
+    .hero-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to right,
+        rgba(20, 50, 20, var(--overlay-l, 0.78)) 0%,
+        rgba(20, 50, 20, var(--overlay-m, 0.45)) 45%,
+        transparent 70%
+      );
+      z-index: 1;
+    }
+
+    /* text column — width & left offset are adjustable */
+    .hero-text {
+      position: absolute;
+      left: var(--text-left, 0%);
+      top: 0;
+      width: var(--text-width, 52%);
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 2rem 3rem 2rem 3.5rem;
+      z-index: 2;
+      color: white;
+    }
+
+    .hero-badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.18);
+      color: rgba(255,255,255,0.92);
+      font-size: 0.75rem; font-weight: 600;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      padding: 0.28rem 0.85rem; border-radius: 99px;
+      margin-bottom: 1.1rem;
+    }
+    .hero-text h1 {
+      font-size: clamp(1.6rem, 2.8vw, 2.6rem);
+      font-weight: 700; line-height: 1.15;
+      margin-bottom: 1rem;
+      color: white;
+    }
+    .hero-text h1 span { color: #9de09d; }
+    .hero-text p {
+      font-size: 0.95rem;
+      color: rgba(255,255,255,0.82);
+      margin-bottom: 1.75rem;
+      max-width: 340px;
+    }
+    .hero-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center; }
+    .btn-primary {
+      background: white; color: #2d6a2d;
+      font-weight: 600; font-size: 0.9rem;
+      padding: 0.65rem 1.4rem; border-radius: 7px;
+      text-decoration: none;
+    }
+    .btn-secondary {
+      border: 2px solid rgba(255,255,255,0.55); color: white;
+      font-weight: 600; font-size: 0.9rem;
+      padding: 0.65rem 1.4rem; border-radius: 7px;
+      text-decoration: none;
+    }
+
+    /* hand cutout — positioned relative to .hero-outer, overflows above hero top */
+    .hero-hand {
+      position: absolute;
+      right: var(--hand-right, 80px);
+      bottom: 0;
+      height: var(--hand-px, 510px);
+      width: auto;
+      z-index: 3;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Hero banner variants — park-treemap</h1>
+
+<!-- LIVE CONTROLS -->
+<div class="controls">
+  <label>Text column width
+    <input type="range" min="30" max="70" value="52" step="1"
+      oninput="setVar('--text-width', this.value+'%'); this.nextElementSibling.value=this.value+'%'">
+    <output>52%</output>
+  </label>
+  <label>Text left offset
+    <input type="range" min="0" max="20" value="0" step="1"
+      oninput="setVar('--text-left', this.value+'%'); this.nextElementSibling.value=this.value+'%'">
+    <output>0%</output>
+  </label>
+  <label>Hand height (px)
+    <input type="range" min="400" max="900" value="510" step="10"
+      oninput="setVar('--hand-px', this.value+'px'); this.nextElementSibling.value=this.value+'px'">
+    <output>510px</output>
+  </label>
+  <label>Hand right offset
+    <input type="range" min="-120" max="80" value="80" step="4"
+      oninput="setVar('--hand-right', this.value+'px'); this.nextElementSibling.value=this.value+'px'">
+    <output>80px</output>
+  </label>
+  <label>Overlay (left)
+    <input type="range" min="0" max="100" value="78" step="2"
+      oninput="setVar('--overlay-l', (this.value/100).toFixed(2)); this.nextElementSibling.value=this.value+'%'">
+    <output>78%</output>
+  </label>
+  <label>Overlay (mid)
+    <input type="range" min="0" max="80" value="45" step="2"
+      oninput="setVar('--overlay-m', (this.value/100).toFixed(2)); this.nextElementSibling.value=this.value+'%'">
+    <output>45%</output>
+  </label>
+  <label>Hero height
+    <input type="range" min="360" max="680" value="440" step="20"
+      oninput="setVar('--hero-height', this.value+'px'); this.nextElementSibling.value=this.value+'px'">
+    <output>440px</output>
+  </label>
+  <label>Hand cutout
+    <select onchange="document.querySelectorAll('.hero-hand').forEach(img => img.src = this.value)">
+      <option value="hand-cutout.png">hand-cutout.png</option>
+      <option value="hand-cutout-lighter.png">hand-cutout-lighter.png</option>
+    </select>
+  </label>
+</div>
+
+<!-- VARIANTS -->
+
+<div class="variant">
+  <div class="variant-label">bg01.jpg</div>
+  <div class="hero-outer"><div class="hero" style="background-image: url('bg01.jpg')">
+    <div class="hero-overlay"></div>
+    <div class="hero-text">
+      <div class="hero-badge">Free &amp; open source</div>
+      <h1>An interactive tree map<br>for your <span>park or garden</span></h1>
+      <p>A free kit that lets any "Friends of" group create their own tree map — browse, photograph, and identify every tree.</p>
+      <div class="hero-actions">
+        <a href="#" class="btn-primary">Get started on GitHub</a>
+        <a href="#" class="btn-secondary">See a live example</a>
+      </div>
+    </div>
+  </div>
+  <img class="hero-hand" src="hand-cutout.png" alt="">
+</div>
+</div>
+
+<div class="variant">
+  <div class="variant-label">bg02.JPG</div>
+  <div class="hero-outer"><div class="hero" style="background-image: url('bg02.JPG')">
+    <div class="hero-overlay"></div>
+    <div class="hero-text">
+      <div class="hero-badge">Free &amp; open source</div>
+      <h1>An interactive tree map<br>for your <span>park or garden</span></h1>
+      <p>A free kit that lets any "Friends of" group create their own tree map — browse, photograph, and identify every tree.</p>
+      <div class="hero-actions">
+        <a href="#" class="btn-primary">Get started on GitHub</a>
+        <a href="#" class="btn-secondary">See a live example</a>
+      </div>
+    </div>
+  </div>
+  <img class="hero-hand" src="hand-cutout.png" alt="">
+</div>
+</div>
+
+<div class="variant">
+  <div class="variant-label">bg03.JPG</div>
+  <div class="hero-outer"><div class="hero" style="background-image: url('bg03.JPG')">
+    <div class="hero-overlay"></div>
+    <div class="hero-text">
+      <div class="hero-badge">Free &amp; open source</div>
+      <h1>An interactive tree map<br>for your <span>park or garden</span></h1>
+      <p>A free kit that lets any "Friends of" group create their own tree map — browse, photograph, and identify every tree.</p>
+      <div class="hero-actions">
+        <a href="#" class="btn-primary">Get started on GitHub</a>
+        <a href="#" class="btn-secondary">See a live example</a>
+      </div>
+    </div>
+  </div>
+  <img class="hero-hand" src="hand-cutout.png" alt="">
+</div>
+</div>
+
+<div class="variant">
+  <div class="variant-label">bg04.JPG</div>
+  <div class="hero-outer"><div class="hero" style="background-image: url('bg04.JPG')">
+    <div class="hero-overlay"></div>
+    <div class="hero-text">
+      <div class="hero-badge">Free &amp; open source</div>
+      <h1>An interactive tree map<br>for your <span>park or garden</span></h1>
+      <p>A free kit that lets any "Friends of" group create their own tree map — browse, photograph, and identify every tree.</p>
+      <div class="hero-actions">
+        <a href="#" class="btn-primary">Get started on GitHub</a>
+        <a href="#" class="btn-secondary">See a live example</a>
+      </div>
+    </div>
+  </div>
+  <img class="hero-hand" src="hand-cutout.png" alt="">
+</div>
+</div>
+
+<div class="variant">
+  <div class="variant-label">bg05.JPG</div>
+  <div class="hero-outer"><div class="hero" style="background-image: url('bg05.JPG')">
+    <div class="hero-overlay"></div>
+    <div class="hero-text">
+      <div class="hero-badge">Free &amp; open source</div>
+      <h1>An interactive tree map<br>for your <span>park or garden</span></h1>
+      <p>A free kit that lets any "Friends of" group create their own tree map — browse, photograph, and identify every tree.</p>
+      <div class="hero-actions">
+        <a href="#" class="btn-primary">Get started on GitHub</a>
+        <a href="#" class="btn-secondary">See a live example</a>
+      </div>
+    </div>
+  </div>
+  <img class="hero-hand" src="hand-cutout.png" alt="">
+</div>
+</div>
+
+<script>
+  function setVar(name, value) {
+    document.documentElement.style.setProperty(name, value);
+  }
+</script>
+
+</body>
+</html>
