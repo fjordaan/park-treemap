@@ -166,6 +166,17 @@
     .devices-wrap {
       position: relative;
       cursor: zoom-in;
+      background: none;
+      border: none;
+      padding: 0;
+      display: block;
+      width: 100%;
+      text-align: left;
+    }
+    .devices-wrap:focus-visible {
+      outline: 3px solid var(--green);
+      outline-offset: 4px;
+      border-radius: 6px;
     }
     .devices-img {
       width: 100%;
@@ -201,6 +212,23 @@
       cursor: zoom-out;
     }
     #devices-lightbox.open { display: flex; }
+    .lightbox-close {
+      position: absolute;
+      top: 1rem; right: 1rem;
+      width: 36px; height: 36px;
+      background: rgba(255,255,255,0.15);
+      border: none;
+      border-radius: 50%;
+      color: white;
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1001;
+    }
+    .lightbox-close:focus-visible {
+      outline: 3px solid white;
+      outline-offset: 2px;
+    }
     #devices-lightbox img {
       max-width: 90vw;
       max-height: 90vh;
@@ -362,15 +390,15 @@
       <p>All tree records live in a Google Sheet you own. Photos are stored in your GitHub repository. No subscription, no vendor lock-in — just your data, in your hands.</p>
       <p>The map works on any device as an installable progressive web app, so volunteers can add trees and photos from their phone while walking the park.</p>
     </div>
-    <div class="devices-wrap" onclick="document.getElementById('devices-lightbox').classList.add('open')">
+    <button class="devices-wrap" aria-label="View larger screenshot of the Park-treemap app" aria-haspopup="dialog">
       <img src="park-treemap-devices02.png" alt="Park-treemap shown on a laptop and a mobile phone" class="devices-img">
-      <div class="devices-zoom-icon">
+      <div class="devices-zoom-icon" aria-hidden="true">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2d6a2d" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
         </svg>
       </div>
-    </div>
+    </button>
   </div>
 </section>
 
@@ -542,13 +570,32 @@
   });
 </script>
 
-<div id="devices-lightbox" onclick="this.classList.remove('open')">
+<div id="devices-lightbox" role="dialog" aria-modal="true" aria-label="Screenshot enlarged">
+  <button class="lightbox-close" aria-label="Close enlarged screenshot">&#x2715;</button>
   <img src="park-treemap-devices02.png" alt="Park-treemap shown on a laptop and a mobile phone">
 </div>
 
 <script>
+  const lightbox = document.getElementById('devices-lightbox');
+  const lightboxTrigger = document.querySelector('.devices-wrap');
+
+  lightboxTrigger.addEventListener('click', () => {
+    lightbox.classList.add('open');
+    setTimeout(() => document.querySelector('.lightbox-close').focus(), 50);
+  });
+
+  function closeLightbox() {
+    lightbox.classList.remove('open');
+    lightboxTrigger.focus();
+  }
+
+  lightbox.addEventListener('click', closeLightbox);
+  document.querySelector('.lightbox-close').addEventListener('click', e => {
+    e.stopPropagation();
+    closeLightbox();
+  });
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') document.getElementById('devices-lightbox').classList.remove('open');
+    if (e.key === 'Escape' && lightbox.classList.contains('open')) closeLightbox();
   });
 
   const nav = document.querySelector('nav');
