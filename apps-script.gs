@@ -24,10 +24,12 @@
  *      Who has access: Anyone
  * 4. Copy the deployment URL and paste it into APPS_SCRIPT_URL in index.html.
  *
- * NOTE: The browser fetches this script with mode:'no-cors', so it cannot read
- *       the response. Errors are logged here (View → Logs) but invisible to
- *       end users. If photo uploads stop working, check the script logs and
- *       PAT expiry first.
+ * NOTE: The browser reads this script's JSON response directly (a plain
+ *       fetch works fine against the deployed web app — no CORS issues), so
+ *       every error returned here (e.g. jsonResponse({status:'error', ...}))
+ *       is shown to the user, not just logged. Errors are still visible here
+ *       too (View → Executions) if you need the full stack. If photo uploads
+ *       stop working, check the script logs and PAT expiry first.
  */
 
 const TREES_SHEET    = 'Trees';

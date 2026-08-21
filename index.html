@@ -1415,8 +1415,34 @@
   const GITHUB_PHOTOS_BASE_URL =
     `https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}/photos/`;
 
+  // POST helper for the Apps Script backend. A plain fetch() (no
+  // mode:'no-cors') works fine against the deployed web app and its JSON
+  // response is fully readable, so real failures — bad contributor token,
+  // script errors, misconfiguration — surface here instead of failing
+  // silently the way an opaque no-cors response would.
+  async function postToScript(payload) {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload)
+    });
+    let data = null;
+    try { data = await res.json(); } catch (e) {}
+    if (!res.ok || !data || data.status !== 'ok') {
+      throw new Error((data && data.message) || `Request failed (HTTP ${res.status})`);
+    }
+    return data;
+  }
+
+  // localStorage is scoped to the origin, not the path — so sibling park
+  // maps hosted under the same GitHub Pages username (e.g. user.github.io/
+  // park-a/ and user.github.io/park-b/) share one storage bucket. Namespace
+  // every key by GITHUB_REPO so enrolling on one park's map can't leak a
+  // contributor token (or view/filter state) into another park's map.
+  const STORAGE_NS = ':' + GITHUB_REPO;
+
   // ── Trusted-contributor token (see docs/12-trusted-contributors.md) ─────────
-  const CONTRIB_KEY = 'parktreemap_contributor_token';
+  const CONTRIB_KEY = 'parktreemap_contributor_token' + STORAGE_NS;
 
   function readContributorToken() {
     try { return localStorage.getItem(CONTRIB_KEY) || ''; } catch (e) { return ''; }
@@ -2025,6 +2051,8 @@
     });
   }
 
+  const EXCLUDE_FILTERS_KEY = 'park-treemap-exclude-filters' + STORAGE_NS;
+
   const EXCLUDE_OPTIONS = [
     { key: 'deadCondition', label: 'Exclude Condition: Dead', match: t => tagKey(t['Condition']) === 'dead',
       conflictsWhen: () => [...document.querySelectorAll('.filter-condition:checked')].some(cb => tagKey(cb.value) === 'dead') },
@@ -2037,7 +2065,7 @@
   ];
   const excludeFilters = { deadCondition: true, shrubForm: false, bushForm: false, hedgeForm: false };
   try {
-    Object.assign(excludeFilters, JSON.parse(localStorage.getItem('park-treemap-exclude-filters') || '{}'));
+    Object.assign(excludeFilters, JSON.parse(localStorage.getItem(EXCLUDE_FILTERS_KEY) || '{}'));
   } catch (e) {}
 
   function matchesFilters(tree) {
@@ -2085,7 +2113,7 @@
         excludeChanged = true;
       }
     });
-    if (excludeChanged) localStorage.setItem('park-treemap-exclude-filters', JSON.stringify(excludeFilters));
+    if (excludeChanged) localStorage.setItem(EXCLUDE_FILTERS_KEY, JSON.stringify(excludeFilters));
     let count = 0;
     markers.forEach((marker, tree) => {
       const show = matchesFilters(tree);
@@ -2230,7 +2258,7 @@
         `<span id="exclude-text-${opt.key}"></span>`;
       row.querySelector('input').onchange = (e) => {
         excludeFilters[opt.key] = e.target.checked;
-        localStorage.setItem('park-treemap-exclude-filters', JSON.stringify(excludeFilters));
+        localStorage.setItem(EXCLUDE_FILTERS_KEY, JSON.stringify(excludeFilters));
         applyFilters();
       };
       container.appendChild(row);
@@ -2344,7 +2372,7 @@
   // Cache the last-fitted view in localStorage so repeat visits open right
   // where the trees actually are, avoiding a jarring flash from MAP_CENTER
   // (which is a placeholder until adopters update it).
-  const VIEW_CACHE_KEY = 'parktreemap_last_view';
+  const VIEW_CACHE_KEY = 'parktreemap_last_view' + STORAGE_NS;
   function readCachedView() {
     try {
       const raw = localStorage.getItem(VIEW_CACHE_KEY);
@@ -2723,18 +2751,13 @@
   function doSubmitFeedback(ref, tree, comment, btn, status, textarea, onSuccess) {
     btn.disabled = true;
     status.innerHTML = withSpinner('Sending…');
-    fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'feedback', ref, tree, comment })
-    }).then(() => {
+    postToScript({ action: 'feedback', ref, tree, comment }).then(() => {
       status.textContent = 'Sent — thank you!';
       textarea.value = '';
       btn.disabled = false;
       if (onSuccess) onSuccess();
-    }).catch(() => {
-      status.textContent = 'Failed to send. Please try again.';
+    }).catch(err => {
+      status.textContent = 'Failed to send: ' + err.message;
       btn.disabled = false;
     });
   }
@@ -3314,61 +3337,51 @@
   });
 
   function uploadPhotoToScript(filename, base64) {
-    return fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({
-        action: 'uploadPhoto',
-        token: readContributorToken(),
-        filename,
-        base64,
-        contentType: 'image/jpeg'
-      })
+    return postToScript({
+      action: 'uploadPhoto',
+      token: readContributorToken(),
+      filename,
+      base64,
+      contentType: 'image/jpeg'
     });
   }
 
   function appendPhotosToScript(ref, paths) {
-    return fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({
-        action: 'appendPhotos',
-        token: readContributorToken(),
-        ref,
-        paths
-      })
+    return postToScript({
+      action: 'appendPhotos',
+      token: readContributorToken(),
+      ref,
+      paths
     });
   }
 
   function deletePhotoFromScript(ref, path) {
-    return fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({
-        action: 'deletePhoto',
-        token: readContributorToken(),
-        ref,
-        path
-      })
+    return postToScript({
+      action: 'deletePhoto',
+      token: readContributorToken(),
+      ref,
+      path
     });
   }
 
   // ── Remove a photo from an existing tree (called from the popup trash) ────
-  // Confirms, fires the Apps Script delete (no-cors, so we can't read the
-  // result), then optimistically drops the path from the in-memory tree and
-  // re-renders the popup. If the server-side delete failed the photo will
-  // reappear on next page reload — same trade-off as the add-photo flow.
+  // Confirms, fires the Apps Script delete, then optimistically drops the
+  // path from the in-memory tree and re-renders the popup. If the
+  // server-side delete failed the photo will reappear on next page reload —
+  // same trade-off as the add-photo flow — but the user is told it failed.
   async function deletePhotoFromTree(ref, path) {
     if (!canContribute() || !ref || !path) return;
     if (!confirm('Remove this photo?')) return;
     let tree = null;
     markers.forEach((_marker, t) => { if (!tree && t['Ref'] === ref) tree = t; });
     if (!tree) return;
-    try { await deletePhotoFromScript(ref, path); }
-    catch (err) { console.warn('deletePhoto failed:', err); }
+    try {
+      await deletePhotoFromScript(ref, path);
+    } catch (err) {
+      console.warn('deletePhoto failed:', err);
+      showToast('Failed to remove photo: ' + err.message);
+      return;
+    }
     const remaining = parsePhotos(tree['Photos']).filter(p => p !== path);
     tree['Photos'] = remaining.join(', ');
     const popup = markers.get(tree)?.getPopup();
@@ -3479,22 +3492,18 @@
     let tree = null;
     markers.forEach((_marker, t) => { if (!tree && t['Ref'] === ref) tree = t; });
     if (!tree) return;
-    // Optimistic removal before the no-cors fetch (response is unreadable anyway).
+    try {
+      await postToScript({ action: 'deleteTree', token: readContributorToken(), ref });
+    } catch (err) {
+      console.warn('deleteTree failed:', err);
+      showToast('Failed to delete tree: ' + err.message);
+      return;
+    }
     closeEditTreeModal();
     const marker = markers.get(tree);
     if (marker) { marker.closePopup(); map.removeLayer(marker); }
     markers.delete(tree);
     updateLabels();
-    try {
-      await fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'deleteTree', token: readContributorToken(), ref })
-      });
-    } catch (err) {
-      console.warn('deleteTree fetch failed:', err);
-    }
     showToast('Tree deleted.');
   }
 
@@ -3525,12 +3534,7 @@
     };
 
     try {
-      await fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(payload)
-      });
+      await postToScript(payload);
 
       // Optimistic update of in-memory tree, popup, and map label.
       let tree = null;
@@ -3559,7 +3563,7 @@
       status.textContent = 'Saved!';
       setTimeout(() => closeEditTreeModal(), 1200);
     } catch (err) {
-      status.textContent = 'Error saving. Please try again.';
+      status.textContent = 'Error saving: ' + err.message;
       btn.disabled = false;
     }
   }
@@ -3695,8 +3699,9 @@
     btn.disabled = true;
 
     // Generate a client-side token used for photo filenames (the Ref column is
-    // computed by a sheet formula and the browser cannot read it back through
-    // the no-cors response — so photo names use this token instead).
+    // computed by an ARRAYFORMULA that only resolves after the sheet recalcs,
+    // so the addTree response can't hand back a real Ref synchronously —
+    // photo names use this token instead).
     const tok = 't-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
 
     // Upload photos sequentially (one POST each — Apps Script payloads have a
@@ -3730,12 +3735,7 @@
     };
     status.innerHTML = withSpinner('Submitting…');
     try {
-      await fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(payload)
-      });
+      await postToScript(payload);
       status.textContent = 'Submitted! Thank you.';
       if (pendingAddMarker) map.removeLayer(pendingAddMarker);
       const newLat = parseFloat(lat);
@@ -3749,7 +3749,7 @@
       schedulePostSubmitReloads(newLat, newLng);
       setTimeout(() => closeAddTreeModal(), 1800);
     } catch (err) {
-      status.textContent = 'Error submitting. Please try again.';
+      status.textContent = 'Error submitting: ' + err.message;
       btn.disabled = false;
     }
   }
@@ -3779,13 +3779,12 @@
       marker.setLatLng([parseFloat(lat), parseFloat(lng)]);
       tree['Latitude']  = lat;
       tree['Longitude'] = lng;
-      fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'repositionTree', token: readContributorToken(), ref, lat, lng })
-      }).catch(err => console.warn('repositionTree fetch failed:', err));
-      showToast('Tree repositioned.');
+      postToScript({ action: 'repositionTree', token: readContributorToken(), ref, lat, lng })
+        .then(() => showToast('Tree repositioned.'))
+        .catch(err => {
+          console.warn('repositionTree failed:', err);
+          showToast('Failed to reposition tree: ' + err.message);
+        });
     }
   });
 
