@@ -3374,6 +3374,9 @@
       dateTimeOriginal = (meta?.DateTimeOriginal instanceof Date) ? meta.DateTimeOriginal : null;
       if (gps) { gpsLat = gps.latitude; gpsLng = gps.longitude; }
     } catch (e) {}
+    // Camera captures (input capture="environment") typically carry no EXIF
+    // date, unlike photos already in the camera roll – fall back to now.
+    if (!dateTimeOriginal) dateTimeOriginal = new Date();
     // Fall back to tree coordinates if the photo has no GPS.
     if (gpsLat === null && treeLat != null && !isNaN(parseFloat(treeLat))) {
       gpsLat = parseFloat(treeLat);
