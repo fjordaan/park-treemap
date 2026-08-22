@@ -119,8 +119,8 @@ reflects their park — for example a logo, or a photo of a notable tree.
 To swap them out:
 
 1. Make a square PNG at **512×512** (this is the source image).
-2. Use a free tool like [favicon.io](https://favicon.io/) to resize it into
-   the four files listed below.
+2. Use the [icon generator](https://claude.ai/code/artifact/adb843e5-66f7-4fa5-bc39-d9bfaf079e7d)
+   to resize it into the four files listed below.
 3. In GitHub, navigate to `icons/`, click **Add file → Upload files**, and
    drop in the new files, replacing the existing ones.
 

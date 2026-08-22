@@ -269,7 +269,8 @@
     .add-tree-more-row { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin: 10px 0 4px; }
     #btn-more-fields, #btn-edit-more-fields { background: none; border: none; cursor: pointer; font-size: 12px; color: #2a7ae2; padding: 0; }
     #btn-more-fields:hover, #btn-edit-more-fields:hover { text-decoration: underline; }
-    .add-tree-more-hint { font-size: 11px; color: #aaa; }
+    .add-tree-more-hint { font-size: 11px; color: #888; }
+    .add-tree-more-hint a { color: #2a7ae2; }
     .add-tree-photos { margin: 12px 0 4px; }
     .add-tree-photos-label { font-size: 12px; font-weight: 600; color: #555; margin-bottom: 6px; }
     .add-tree-photo-thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
@@ -475,7 +476,8 @@
       display: none;
     }
     @media (max-width: 767px) { #tree-count-handle { display: block; } }
-    #tree-count-modal h3 { margin: 0 0 14px; font-size: 15px; color: #1a1a1a; }
+    #tree-count-modal h3 { margin: 0 0 4px; font-size: 15px; color: #1a1a1a; }
+    #tree-count-modal .modal-subtitle { margin: 0 0 14px; font-size: 12px; line-height: 1.2; color: #777; }
     .exclude-opt {
       display: flex;
       align-items: center;
@@ -618,9 +620,11 @@
     @media (hover: hover) {
       .park-marker-wrap:hover .park-marker-label { display: block; }
     }
-    .park-popup { font-size: 13px; }
+    .park-popup { font-size: 13px; display: flex; align-items: center; gap: 8px; }
+    .park-popup-icon { width: 32px; height: 32px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
     .park-popup b { display: block; margin-bottom: 4px; }
     .park-popup a { color: #2a7ae2; }
+    .park-popup-arrow { text-decoration: none; display: inline-block; }
 
     .section-label {
       background: none;
@@ -1030,6 +1034,29 @@
     }
     #info-attribution a { color: #2a7ae2; }
 
+    /* ── MAP LOADING INDICATOR (shown while the first tree-data fetch is in flight) ── */
+    #map-loading {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1001;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      color: #666;
+      font-size: 14px;
+      pointer-events: none;
+    }
+    #map-loading.hidden { display: none; }
+    #map-loading-spinner {
+      width: 32px; height: 32px;
+      border: 3px solid rgba(0,0,0,0.15);
+      border-top-color: #3B7A5C;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
     /* ── WELCOME OVERLAY (shown when the sheet has no trees yet) ── */
     #welcome-overlay {
       display: none;
@@ -1070,6 +1097,7 @@
 </head>
 <body>
   <div id="map"></div>
+  <div id="map-loading"><div id="map-loading-spinner"></div><span>Loading tree data…</span></div>
   <div id="map-dim" onclick="togglePanel()"></div>
   <div id="add-toast">Copied!</div>
   <div id="hover-label"></div>
@@ -1098,7 +1126,7 @@
     <div class="info-row" id="info-sheet-row">Tree spreadsheet: <a id="info-sheet" href="#" target="_blank" rel="noopener">open in Google Sheets</a></div>
     <div class="info-row" id="info-enrol-row">Want to add trees from this device? <a href="#" onclick="enrolDeviceManually(); return false;">Enrol this device</a></div>
     <div id="info-attribution">
-      Built with <a href="https://github.com/fjordaan/park-treemap" target="_blank" rel="noopener">park-treemap</a> — a free, self-hosted tree-map template for any park's "Friends of" group.
+      Built with <a href="https://park-treemap.fulhamcemeteryfriends.org.uk/" target="_blank" rel="noopener">park-treemap</a> — a free, self-hosted tree-map template for any park's "Friends of" group.
     </div>
   </div>
 
@@ -1374,6 +1402,7 @@
   <div id="tree-count-modal">
     <div id="tree-count-handle"></div>
     <h3>Refine tree count (currently <span id="tree-count-modal-total">0</span>)</h3>
+    <p class="modal-subtitle">Exclude categories below from the count shown on the map – trees stay visible, they're just not counted.</p>
     <div id="tree-count-options"></div>
     <div class="tree-count-modal-actions">
       <button type="button" class="btn-cancel-modal" onclick="closeTreeCountModal()">Done</button>
@@ -2433,12 +2462,14 @@
       text = await resp.text();
     } catch (err) {
       if (!silent) {
+        document.getElementById('map-loading').classList.add('hidden');
         document.getElementById('tree-count').textContent = 'Failed to load data';
         console.error('Could not fetch tree data:', err);
         showDataErrorOverlay(err);
       }
       return null;
     }
+    if (!silent) document.getElementById('map-loading').classList.add('hidden');
 
     const rows = parseCSV(text);
     if (rows.length < 2) {
@@ -2546,8 +2577,12 @@
         iconAnchor: [9, 9]
       });
       const marker = L.marker([park.lat, park.lng], { icon });
+      const iconUrl = new URL('icons/icon-192.png', park.url).href;
       marker.bindPopup(
-        `<div class="park-popup"><b>${esc(park.name)}</b><a href="${esc(park.url)}" target="_blank" rel="noopener">Open map ↗</a></div>`
+        `<div class="park-popup">` +
+          `<img class="park-popup-icon" src="${esc(iconUrl)}" alt="" onerror="this.remove()">` +
+          `<div><b>${esc(park.name)}</b><a href="${esc(park.url)}" target="_blank" rel="noopener">Open map <span class="park-popup-arrow">↗</span></a></div>` +
+        `</div>`
       );
       parkMarkerLayer.addLayer(marker);
     });
