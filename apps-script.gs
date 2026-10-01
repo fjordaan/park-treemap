@@ -67,6 +67,7 @@ function doPost(e) {
     const data = JSON.parse(e.postData.contents);
     switch (data.action) {
       case 'feedback':      return handleFeedback(data);
+      case 'validateToken': return requireContributorToken(data) || jsonResponse({ status: 'ok' });
       case 'addTree':       return requireContributorToken(data) || handleAddTree(data);
       case 'uploadPhoto':   return requireContributorToken(data) || handleUploadPhoto(data);
       case 'appendPhotos':  return requireContributorToken(data) || handleAppendPhotos(data);

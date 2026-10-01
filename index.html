@@ -1532,17 +1532,41 @@
     return !ENABLE_CONTRIBUTOR_GATE || isEnrolledContributor();
   }
 
-  // If the URL contains ?enrol=<token>, store the token and strip it from
-  // the address bar so it doesn't end up in bookmarks / browser history.
+  // isEnrolledContributor() only checks that *something* is stored under
+  // CONTRIB_KEY, not that it's actually correct — so an invalid token must
+  // never be persisted in the first place, or the enrolled UI (Add Tree
+  // button, photo slots, etc.) appears without being able to submit
+  // anything. This checks a candidate token against the server before
+  // either enrolment path stores it.
+  async function validateContributorToken(token) {
+    try {
+      await postToScript({ action: 'validateToken', token });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // If the URL contains ?enrol=<token>, validate it and, if valid, store
+  // it — either way, strip it from the address bar so it doesn't end up in
+  // bookmarks / browser history. An invalid token (corrupted link, stale
+  // after the contributor token was rotated) is never persisted.
   (function enrolFromUrl() {
     const params = new URLSearchParams(window.location.search);
     const tok = params.get('enrol');
     if (!tok) return;
-    try { localStorage.setItem(CONTRIB_KEY, tok); } catch (e) {}
     params.delete('enrol');
     const clean = params.toString();
     const newUrl = window.location.pathname + (clean ? '?' + clean : '') + window.location.hash;
     history.replaceState({}, '', newUrl);
+    validateContributorToken(tok).then(valid => {
+      if (valid) {
+        try { localStorage.setItem(CONTRIB_KEY, tok); } catch (e) {}
+        location.reload();
+      } else {
+        showToast('Either that link is invalid, or there was a connection problem. Please try again.');
+      }
+    });
   })();
 
   // The "tree map" suffix is added by code; PARK_NAME is just the park's name.
@@ -1571,7 +1595,7 @@
   // in this context (e.g. inside an iOS home-screen PWA, which has its
   // own localStorage isolated from Safari's). Accepts the full magic link
   // OR just the bare contributor token.
-  function enrolDeviceManually() {
+  async function enrolDeviceManually() {
     const input = prompt(
       'Paste your magic enrolment link, or just the contributor password:'
     );
@@ -1583,6 +1607,11 @@
       if (param) token = param;
     } catch (e) { /* not a URL, treat as bare token */ }
     if (!token) return;
+    const valid = await validateContributorToken(token);
+    if (!valid) {
+      alert('Either that link/password is wrong, or there was a connection problem. Please try again.');
+      return;
+    }
     try { localStorage.setItem(CONTRIB_KEY, token); } catch (e) {}
     // Reload so every contributor-gated surface (Add Tree button, popup
     // +Add photo slots, photo-delete overlays) re-renders enrolled. The
