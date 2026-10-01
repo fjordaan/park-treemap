@@ -99,6 +99,36 @@
       color: #2a7ae2; display: flex; align-items: center;
     }
     #filter-share:hover { color: #1a5ab8; }
+    #filter-search-toggle {
+      background: none; border: none; padding: 0; cursor: pointer;
+      color: #555; display: flex; align-items: center;
+    }
+    #filter-search-toggle:hover { color: #1a5ab8; }
+    #filter-search-toggle.active { color: #2a7ae2; }
+    .panel-header-separator {
+      width: 1px;
+      height: 14px;
+      background: #ddd;
+    }
+    .filter-search-wrap { position: relative; }
+    #filter-search {
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 16px; /* prevent iOS zoom on focus */
+      padding: 6px 26px 6px 8px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      font-family: inherit;
+    }
+    #filter-search-clear {
+      position: absolute;
+      top: 50%; right: 2px;
+      transform: translateY(calc(-50% - 2px));
+      background: none; border: none; cursor: pointer;
+      font-size: 18px; color: #888; line-height: 1;
+      padding: 4px 6px;
+    }
+    #filter-search-clear:hover { color: #333; }
 
     #map.add-mode { cursor: crosshair; }
 
@@ -1280,7 +1310,20 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         </button>
       </span>
-      <button id="filter-reset" onclick="resetFilters()">Reset</button>
+      <span style="display:flex;align-items:center;gap:8px">
+        <button id="filter-search-toggle" onclick="toggleSearchFilter()" title="Search trees" aria-label="Search trees">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </button>
+        <span class="panel-header-separator"></span>
+        <button id="filter-reset" onclick="resetFilters()">Reset</button>
+      </span>
+    </div>
+
+    <div class="filter-section" id="filter-search-row" style="display:none">
+      <div class="filter-search-wrap">
+        <input type="text" id="filter-search" placeholder="Search trees by name or number" aria-label="Search trees by name or number" oninput="onSearchInput()">
+        <button type="button" id="filter-search-clear" onclick="closeSearchFilter()" aria-label="Close search" title="Close search">&times;</button>
+      </div>
     </div>
 
     <div class="filter-section">
@@ -1437,7 +1480,7 @@
           <label>Year planted
             <input name="year_planted" type="text" inputmode="numeric" placeholder="e.g. 2021">
           </label>
-          <label>Est. year planted
+          <label>Estimated year planted
             <input name="est_year_planted" type="text" inputmode="numeric" placeholder="e.g. 2015">
           </label>
         </div>
@@ -1538,7 +1581,7 @@
     <div id="lightbox-date"></div>
     <img id="lightbox-img" src="" referrerpolicy="no-referrer" alt="Tree photo" draggable="false" onclick="toggleLightboxZoom(event)"
          onload="document.getElementById('lightbox').classList.remove('loading')"
-         onerror="document.getElementById('lightbox').classList.remove('loading')"/>
+         onerror="if (!retryImgLoad(this)) document.getElementById('lightbox').classList.remove('loading')"/>
     <div id="lightbox-bar">
       <button class="nav" id="lightbox-prev" onclick="stepLightbox(-1)">&#8249;</button>
       <a id="lightbox-open" href="" target="_blank" rel="noopener" referrerpolicy="no-referrer">
@@ -1607,17 +1650,41 @@
     return !ENABLE_CONTRIBUTOR_GATE || isEnrolledContributor();
   }
 
-  // If the URL contains ?enrol=<token>, store the token and strip it from
-  // the address bar so it doesn't end up in bookmarks / browser history.
+  // isEnrolledContributor() only checks that *something* is stored under
+  // CONTRIB_KEY, not that it's actually correct — so an invalid token must
+  // never be persisted in the first place, or the enrolled UI (Add Tree
+  // button, photo slots, etc.) appears without being able to submit
+  // anything. This checks a candidate token against the server before
+  // either enrolment path stores it.
+  async function validateContributorToken(token) {
+    try {
+      await postToScript({ action: 'validateToken', token });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // If the URL contains ?enrol=<token>, validate it and, if valid, store
+  // it — either way, strip it from the address bar so it doesn't end up in
+  // bookmarks / browser history. An invalid token (corrupted link, stale
+  // after the contributor token was rotated) is never persisted.
   (function enrolFromUrl() {
     const params = new URLSearchParams(window.location.search);
     const tok = params.get('enrol');
     if (!tok) return;
-    try { localStorage.setItem(CONTRIB_KEY, tok); } catch (e) {}
     params.delete('enrol');
     const clean = params.toString();
     const newUrl = window.location.pathname + (clean ? '?' + clean : '') + window.location.hash;
     history.replaceState({}, '', newUrl);
+    validateContributorToken(tok).then(valid => {
+      if (valid) {
+        try { localStorage.setItem(CONTRIB_KEY, tok); } catch (e) {}
+        location.reload();
+      } else {
+        showToast('Either that link is invalid, or there was a connection problem. Please try again.');
+      }
+    });
   })();
 
   // The "tree map" suffix is added by code; PARK_NAME is just the park's name.
@@ -1680,7 +1747,7 @@
   // in this context (e.g. inside an iOS home-screen PWA, which has its
   // own localStorage isolated from Safari's). Accepts the full magic link
   // OR just the bare contributor token.
-  function enrolDeviceManually() {
+  async function enrolDeviceManually() {
     const input = prompt(
       'Paste your magic enrolment link, or just the contributor password:'
     );
@@ -1692,6 +1759,11 @@
       if (param) token = param;
     } catch (e) { /* not a URL, treat as bare token */ }
     if (!token) return;
+    const valid = await validateContributorToken(token);
+    if (!valid) {
+      alert('Either that link/password is wrong, or there was a connection problem. Please try again.');
+      return;
+    }
     try { localStorage.setItem(CONTRIB_KEY, token); } catch (e) {}
     // Reload so every contributor-gated surface (Add Tree button, popup
     // +Add photo slots, photo-delete overlays) re-renders enrolled. The
@@ -1942,6 +2014,22 @@
     return GITHUB_PHOTOS_BASE_URL + rel;
   }
 
+  // raw.githubusercontent.com intermittently returns a transient error (seen
+  // as sporadic 503s) even though the file exists — an <img> never retries a
+  // failed load on its own, so one hiccup leaves a permanently broken photo
+  // until the whole page is reloaded. Retry a couple of times with a short
+  // backoff before giving up. Returns true if a retry was scheduled, false
+  // once attempts are exhausted (caller should treat that as a final failure).
+  function retryImgLoad(img, maxAttempts = 2) {
+    const attempt = (parseInt(img.dataset.retryAttempt || '0', 10)) + 1;
+    if (attempt > maxAttempts) return false;
+    img.dataset.retryAttempt = attempt;
+    const base = img.dataset.retryBaseSrc || img.src.split('?')[0];
+    img.dataset.retryBaseSrc = base;
+    setTimeout(() => { img.src = base + '?retry=' + attempt; }, 500 * attempt);
+    return true;
+  }
+
   function parsePhotos(photoStr) {
     if (!photoStr) return [];
     return photoStr.split(',').map(s => s.trim()).filter(Boolean);
@@ -2006,7 +2094,7 @@
         const deleteOverlay = showDelete
           ? `<button type="button" class="photo-delete" title="Remove this photo" onclick="event.stopPropagation(); deletePhotoFromTree('${refAttr}', '${pathAttr}'); return false;"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>`
           : '';
-        html += `<div class="photo-thumb-wrap"><a class="photo-thumb-link" href="#" data-photos="${resolvedAttr}" data-index="${i}" onclick="openLightbox(JSON.parse(this.dataset.photos), +this.dataset.index); return false;"><img src="${thumb}" loading="lazy" referrerpolicy="no-referrer" alt="Tree photo"/></a>${deleteOverlay}</div>`;
+        html += `<div class="photo-thumb-wrap"><a class="photo-thumb-link" href="#" data-photos="${resolvedAttr}" data-index="${i}" onclick="openLightbox(JSON.parse(this.dataset.photos), +this.dataset.index); return false;"><img src="${thumb}" loading="lazy" referrerpolicy="no-referrer" alt="Tree photo" onerror="retryImgLoad(this)"/></a>${deleteOverlay}</div>`;
       });
       if (canAddPhoto) {
         html += `<button type="button" class="photo-add-slot" title="Add a photo to this tree" onclick="addPhotoToExistingTree('${refAttr}'); return false;"><span class="photo-add-slot-icon">+📷</span><span class="photo-add-slot-label">Add photo</span></button>`;
@@ -2018,7 +2106,7 @@
     if (sciVal) html += row('Common name', comVal);
     html += row('Other names',      tree['Other names']);
     html += row('Year planted',     tree['Year planted'],     tree['Year planted']     ? ageSuffix : '');
-    html += row('Est. year planted',tree['Est. year planted'],tree['Est. year planted'] ? ageSuffix : '');
+    html += row('Estimated year planted',tree['Est. year planted'],tree['Est. year planted'] ? ageSuffix : '');
     html += row('Year died',        tree['Year died']);
     html += row('Form',             tree['Form']);
     html += row('Condition',        tree['Condition']);
@@ -2090,14 +2178,19 @@
     };
 
     for (const tree of trees) {
+      // Condition/Form counts always reflect the true total (see
+      // isRefineExcluded) — everything else here is a plain narrowing
+      // filter, so its count should match what "Refine tree count"
+      // currently excludes from the headline total.
+      if (tree['Condition']) bump(condBuckets, tree['Condition']);
+      if (tree['Form'])      bump(formBuckets, tree['Form']);
+      if (isRefineExcluded(tree)) continue;
       const sci   = tree['Scientific name'];
       const com   = tree['Common name'];
       const short = tree['Short name'];
       if (sci)   sciCounts[sci]     = (sciCounts[sci]     || 0) + 1;
       if (com)   commonCounts[com]  = (commonCounts[com]  || 0) + 1;
       if (short) shortCounts[short] = (shortCounts[short] || 0) + 1;
-      if (tree['Condition']) bump(condBuckets, tree['Condition']);
-      if (tree['Form'])      bump(formBuckets, tree['Form']);
       for (const tag of parseTags(tree['Tags'])) {
         bump(isNewTag(tag) ? newTagBuckets : tagBuckets, tag);
       }
@@ -2159,15 +2252,18 @@
     showIf('filter-section-forms',      Object.keys(formBuckets).length   > 0);
 
     // Insert "Non-native (hide)" filter after the Native checkbox, and a
-    // "Hide self-sown" filter after the Self-sown checkbox.
-    const nonNativeCount = trees.filter(t => {
+    // "Hide self-sown" filter after the Self-sown checkbox. Both are
+    // exclude-style toggles like "Refine tree count", so their counts
+    // should reflect what's currently excluded from the headline total too.
+    const countableTrees = trees.filter(t => !isRefineExcluded(t));
+    const nonNativeCount = countableTrees.filter(t => {
       const tags = parseTags(t['Tags']);
       return !tags.some(tag => /\bnative\b/i.test(tag));
     }).length;
     const selfSownCb = [...document.querySelectorAll('#filter-tags .filter-tag')]
       .find(cb => /\bself.sown\b/i.test(cb.value));
     if (selfSownCb) {
-      const hideSelfSownCount = trees.filter(t => {
+      const hideSelfSownCount = countableTrees.filter(t => {
         const tags = parseTags(t['Tags']);
         return !tags.some(tag => /\bself.sown\b/i.test(tag));
       }).length;
@@ -2253,6 +2349,15 @@
     Object.assign(excludeFilters, JSON.parse(localStorage.getItem(EXCLUDE_FILTERS_KEY) || '{}'));
   } catch (e) {}
 
+  // Whether a tree is currently hidden from the tree-count total by a
+  // "Refine tree count" exclude setting (e.g. the default Exclude Dead).
+  // Condition/Form counts deliberately ignore this — checking "Dead" or
+  // "Shrub" auto-disables the conflicting exclude setting (see
+  // conflictsWhen above), so their counts should reflect the true total.
+  function isRefineExcluded(tree) {
+    return EXCLUDE_OPTIONS.some(opt => excludeFilters[opt.key] && opt.match(tree));
+  }
+
   function matchesFilters(tree) {
     const sciFilter    = document.getElementById('filter-sci').value;
     const commonFilter = document.getElementById('filter-common').value;
@@ -2264,6 +2369,14 @@
     if (sciFilter    && tree['Scientific name'] !== sciFilter)    return false;
     if (commonFilter && tree['Common name']     !== commonFilter) return false;
     if (shortFilter  && tree['Short name']      !== shortFilter)  return false;
+    const searchTerm = document.getElementById('filter-search').value.trim().toLowerCase();
+    if (searchTerm) {
+      const haystack = [
+        tree['Ref'], tree['Number'], tree['Scientific name'],
+        tree['Common name'], tree['Short name'], tree['Other names']
+      ].filter(Boolean).join(' ').toLowerCase();
+      if (!haystack.includes(searchTerm)) return false;
+    }
     if (checkedTags.length) {
       const treeTagKeys = parseTags(tree['Tags']).map(tagKey);
       if (!checkedTags.some(t => treeTagKeys.includes(t))) return false;
@@ -2304,7 +2417,7 @@
       const show = matchesFilters(tree);
       if (show) {
         if (!map.hasLayer(marker)) marker.addTo(map);
-        if (!EXCLUDE_OPTIONS.some(opt => excludeFilters[opt.key] && opt.match(tree))) count++;
+        if (!isRefineExcluded(tree)) count++;
       } else {
         if (map.hasLayer(marker)) marker.remove();
         const tooltip = marker.getTooltip();
@@ -2343,6 +2456,8 @@
     if (sci)    params.set('sci',    sci);
     if (common) params.set('common', common);
     if (short)  params.set('short',  short);
+    const search = document.getElementById('filter-search').value.trim();
+    if (search) params.set('search', search);
     const tags  = [...document.querySelectorAll('.filter-tag:checked')].map(cb => cb.value);
     const conds = [...document.querySelectorAll('.filter-condition:checked')].map(cb => cb.value);
     const forms = [...document.querySelectorAll('.filter-form:checked')].map(cb => cb.value);
@@ -2394,6 +2509,11 @@
     const sci = params.get('sci');     if (sci)    document.getElementById('filter-sci').value    = sci;
     const common = params.get('common'); if (common) document.getElementById('filter-common').value = common;
     const short  = params.get('short');  if (short)  document.getElementById('filter-short').value  = short;
+    const search = params.get('search');
+    if (search) {
+      document.getElementById('filter-search').value = search;
+      openSearchFilter();
+    }
     if (params.has('tags')) {
       const tags = params.get('tags').split(',').map(tagKey);
       document.querySelectorAll('.filter-tag').forEach(cb => { if (tags.includes(cb.value)) cb.checked = true; });
@@ -2429,9 +2549,35 @@
       .forEach(el => { el.checked = false; });
     document.querySelectorAll('#filter-months input').forEach(cb => { cb.checked = false; });
     document.querySelectorAll('.month-btn').forEach(el => el.classList.remove('selected'));
+    closeSearchFilter();
     applyFilters();
   }
 
+  // ── Free-text search filter ─────────────────────────────────────────────────
+  let searchDebounceTimer = null;
+
+  function openSearchFilter() {
+    document.getElementById('filter-search-row').style.display = '';
+    document.getElementById('filter-search-toggle').classList.add('active');
+    document.getElementById('filter-search').focus();
+  }
+
+  function closeSearchFilter() {
+    document.getElementById('filter-search-row').style.display = 'none';
+    document.getElementById('filter-search-toggle').classList.remove('active');
+    const input = document.getElementById('filter-search');
+    if (input.value) { input.value = ''; applyFilters(); }
+  }
+
+  function toggleSearchFilter() {
+    const isOpen = document.getElementById('filter-search-row').style.display !== 'none';
+    if (isOpen) closeSearchFilter(); else openSearchFilter();
+  }
+
+  function onSearchInput() {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(applyFilters, 120);
+  }
 
   function buildTreeCountModal() {
     const container = document.getElementById('tree-count-options');
@@ -2814,6 +2960,8 @@
     const img = document.getElementById('lightbox-img');
     lbResetZoom();
     document.getElementById('lightbox').classList.add('loading');
+    delete img.dataset.retryAttempt;
+    delete img.dataset.retryBaseSrc;
     img.src = large;
     const dateEl = document.getElementById('lightbox-date');
     dateEl.classList.remove('visible');
