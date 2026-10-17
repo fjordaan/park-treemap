@@ -19,6 +19,9 @@ whole thing off if you'd rather have a fully open map.
 >   offensive content, the only complete cleanup is to delete the
 >   whole repository. Worth thinking about before you decide whether
 >   to leave the map open or to keep this default gating on.
+> - This only controls who can **add** things. It doesn't make your
+>   map or its data private — anyone can already see everything on
+>   it, enrolled or not. See [docs/01](01-setup-google-sheet.md#12-make-the-sheet-readable-by-anyone-with-the-link).
 
 ## How it works in plain terms
 
