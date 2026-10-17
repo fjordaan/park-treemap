@@ -45,9 +45,13 @@ signing in.
 3. Make sure the role on the right is set to **Viewer**.
 4. Click **Done**.
 
-This only makes the sheet *readable* to anyone who already knows the
-URL — it doesn't make it editable, and nobody can find it by
-searching.
+> 💡 **Your tree data is public, not private.** This step only stops
+> strangers *editing* your sheet — it doesn't hide what's in it.
+> Anyone who visits your live map can already see all of it, and your
+> Sheet's address is stored in your GitHub repository, which is
+> public too. If there's anything in your park's records you wouldn't
+> want anyone to see, leave it out of the sheet rather than relying
+> on this setting to hide it.
 
 ## 1.3 Copy the Sheet ID
 
