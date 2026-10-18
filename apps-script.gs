@@ -292,10 +292,34 @@ function handleAppendPhotos(data) {
   }
 }
 
+// ── Is a photo path referenced by any other tree? ─────────────────────────────
+// Adopters sometimes reuse the same uploaded photo on more than one tree by
+// copying its path into another row's Photos cell. Deleting the file from
+// GitHub in that case would silently break it everywhere else it's used, so
+// callers check this first and only delete from GitHub when nothing else
+// references the path.
+function photoPathUsedElsewhere(sheet, path, excludeRowNum) {
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const photosCol = headers.indexOf('Photos') + 1;
+  if (!photosCol) return false;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return false;
+  const vals = sheet.getRange(3, photosCol, lastRow - 2, 1).getValues();
+  for (let i = 0; i < vals.length; i++) {
+    const rowNum = i + 3;
+    if (rowNum === excludeRowNum) continue;
+    const paths = String(vals[i][0] || '').split(',').map(s => s.trim());
+    if (paths.indexOf(path) !== -1) return true;
+  }
+  return false;
+}
+
 // ── Delete a photo from an existing tree ──────────────────────────────────────
-// Removes the file from the GitHub repo via the Contents API and strips its
-// path from the tree's Photos cell. Wrapped in a script lock so it can't race
-// with handleAppendPhotos on the same row.
+// Strips the path from the tree's Photos cell, and also deletes the file from
+// the GitHub repo via the Contents API — but only if no other tree's Photos
+// cell still references that same path (see photoPathUsedElsewhere above).
+// Wrapped in a script lock so it can't race with handleAppendPhotos on the
+// same row.
 function handleDeletePhoto(data) {
   if (!data.ref || !data.path) {
     return jsonResponse({ status: 'error', message: 'Missing ref or path' });
@@ -304,57 +328,63 @@ function handleDeletePhoto(data) {
   if (data.path.indexOf('..') !== -1 || data.path.indexOf(PHOTOS_DIR + '/') !== 0) {
     return jsonResponse({ status: 'error', message: 'Invalid path' });
   }
-  const repo  = githubRepo();
-  const token = githubToken();
-  if (!repo || !token) {
-    return jsonResponse({ status: 'error', message: 'GITHUB_REPO and/or GITHUB_TOKEN script properties not set' });
-  }
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    // 1) Look up the file's blob sha, then delete it from the repo.
-    const apiUrl = 'https://api.github.com/repos/' + repo + '/contents/' + data.path;
-    const headers = {
-      Authorization: 'Bearer ' + token,
-      Accept:        'application/vnd.github+json'
-    };
-    const getResp = UrlFetchApp.fetch(apiUrl, {
-      method: 'get',
-      headers: headers,
-      muteHttpExceptions: true
-    });
-    const getCode = getResp.getResponseCode();
-    if (getCode === 404) {
-      // File already gone in the repo — fall through and still tidy the sheet.
-      Logger.log('Photo not in repo (already deleted?): ' + data.path);
-    } else if (getCode < 200 || getCode >= 300) {
-      Logger.log('GitHub GET failed (' + getCode + '): ' + getResp.getContentText());
-      return jsonResponse({ status: 'error', code: getCode, message: getResp.getContentText() });
-    } else {
-      const sha = JSON.parse(getResp.getContentText()).sha;
-      const delResp = UrlFetchApp.fetch(apiUrl, {
-        method: 'delete',
-        contentType: 'application/json',
-        headers: headers,
-        payload: JSON.stringify({
-          message: 'Delete photo ' + data.path + ' via park-treemap',
-          sha:     sha,
-          branch:  GITHUB_BRANCH
-        }),
-        muteHttpExceptions: true
-      });
-      const delCode = delResp.getResponseCode();
-      if (delCode < 200 || delCode >= 300) {
-        Logger.log('GitHub DELETE failed (' + delCode + '): ' + delResp.getContentText());
-        return jsonResponse({ status: 'error', code: delCode, message: delResp.getContentText() });
-      }
-    }
-    // 2) Strip the path from the tree's Photos cell.
     const sheet = SpreadsheetApp.openById(sheetId()).getSheetByName(TREES_SHEET);
     if (!sheet) return jsonResponse({ status: 'error', message: 'Sheet "' + TREES_SHEET + '" not found' });
     const row = findTreeRow(sheet, data.ref);
     if (row && row.error) return jsonResponse({ status: 'error', message: row.error });
     if (!row) return jsonResponse({ status: 'error', message: 'Tree not found: ' + data.ref });
+
+    // 1) Delete the file from GitHub — unless another tree still uses it.
+    if (!photoPathUsedElsewhere(sheet, data.path, row.rowNum)) {
+      const repo  = githubRepo();
+      const token = githubToken();
+      if (!repo || !token) {
+        return jsonResponse({ status: 'error', message: 'GITHUB_REPO and/or GITHUB_TOKEN script properties not set' });
+      }
+      const apiUrl = 'https://api.github.com/repos/' + repo + '/contents/' + data.path;
+      const headers = {
+        Authorization: 'Bearer ' + token,
+        Accept:        'application/vnd.github+json'
+      };
+      const getResp = UrlFetchApp.fetch(apiUrl, {
+        method: 'get',
+        headers: headers,
+        muteHttpExceptions: true
+      });
+      const getCode = getResp.getResponseCode();
+      if (getCode === 404) {
+        // File already gone in the repo — fall through and still tidy the sheet.
+        Logger.log('Photo not in repo (already deleted?): ' + data.path);
+      } else if (getCode < 200 || getCode >= 300) {
+        Logger.log('GitHub GET failed (' + getCode + '): ' + getResp.getContentText());
+        return jsonResponse({ status: 'error', code: getCode, message: getResp.getContentText() });
+      } else {
+        const sha = JSON.parse(getResp.getContentText()).sha;
+        const delResp = UrlFetchApp.fetch(apiUrl, {
+          method: 'delete',
+          contentType: 'application/json',
+          headers: headers,
+          payload: JSON.stringify({
+            message: 'Delete photo ' + data.path + ' via park-treemap',
+            sha:     sha,
+            branch:  GITHUB_BRANCH
+          }),
+          muteHttpExceptions: true
+        });
+        const delCode = delResp.getResponseCode();
+        if (delCode < 200 || delCode >= 300) {
+          Logger.log('GitHub DELETE failed (' + delCode + '): ' + delResp.getContentText());
+          return jsonResponse({ status: 'error', code: delCode, message: delResp.getContentText() });
+        }
+      }
+    } else {
+      Logger.log('Photo still used by another tree, keeping file in repo: ' + data.path);
+    }
+
+    // 2) Strip the path from this tree's Photos cell.
     const cell    = sheet.getRange(row.rowNum, row.photosCol);
     const current = String(cell.getValue() || '').trim();
     const remaining = current
@@ -478,11 +508,13 @@ function handleDeleteTree(data) {
     const row = findTreeRow(sheet, data.ref);
     if (row && row.error) return jsonResponse({ status: 'error', message: row.error });
     if (!row) return jsonResponse({ status: 'error', message: 'Tree not found: ' + data.ref });
-    // Delete each repo-hosted photo from GitHub.
+    // Delete each repo-hosted photo from GitHub — unless another tree's row
+    // still references that same path (see photoPathUsedElsewhere above).
     const photosCell = String(sheet.getRange(row.rowNum, row.photosCol).getValue() || '').trim();
     const repoPaths  = photosCell
       .split(',').map(s => s.trim())
-      .filter(p => p && p.indexOf('..') === -1 && p.indexOf(PHOTOS_DIR + '/') === 0);
+      .filter(p => p && p.indexOf('..') === -1 && p.indexOf(PHOTOS_DIR + '/') === 0)
+      .filter(p => !photoPathUsedElsewhere(sheet, p, row.rowNum));
     const repo  = githubRepo();
     const token = githubToken();
     if (repo && token && repoPaths.length) {
