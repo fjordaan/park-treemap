@@ -11,6 +11,9 @@
  *   7. action: 'deleteTree'      → deletes a tree's repo photos and removes its spreadsheet row
  *   8. action: 'repositionTree'  → updates the Latitude and Longitude of an existing tree
  *
+ * Every action above except 'uploadPhoto' and 'validateToken' also appends a
+ * row to the History sheet (created on first use) — see appendHistory().
+ *
  * SETUP
  * -----
  * 1. In script.google.com create a new project and paste this entire file.
@@ -34,6 +37,7 @@
 
 const TREES_SHEET    = 'Trees';
 const FEEDBACK_SHEET = 'Feedback';
+const HISTORY_SHEET  = 'History';
 const GITHUB_BRANCH  = 'main';
 const PHOTOS_DIR     = 'photos';
 
@@ -101,6 +105,21 @@ function handleFeedback(data) {
   return jsonResponse({ status: 'ok' });
 }
 
+// ── History log ───────────────────────────────────────────────────────────────
+// A static, append-only log read by the map's History panel. Nothing reads
+// git or re-derives past state — every mutation below writes its own row at
+// the moment it happens. `count` is only meaningful for 'appendPhotos' (more
+// than one photo can be added in a single call); leave it undefined elsewhere.
+function appendHistory(action, ref, treeLabel, count) {
+  const ss = SpreadsheetApp.openById(sheetId());
+  let sheet = ss.getSheetByName(HISTORY_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(HISTORY_SHEET);
+    sheet.appendRow(['Timestamp', 'Action', 'Ref', 'Tree', 'Count']);
+  }
+  sheet.appendRow([new Date(), action, ref || '', treeLabel || '', count || '']);
+}
+
 // ── Add tree ──────────────────────────────────────────────────────────────────
 function handleAddTree(data) {
   const ss    = SpreadsheetApp.openById(sheetId());
@@ -147,6 +166,16 @@ function handleAddTree(data) {
     sheet.getRange(3, 1, sheet.getLastRow() - 2, sheet.getLastColumn())
          .sort(sortSpec);
   }
+
+  // Ref is an ARRAYFORMULA column, so the new row's Ref doesn't exist as a
+  // value until Sheets recalculates. Flush, then locate the new row by its
+  // own Lat/Lng (stable regardless of where the sort above moved it) to
+  // read the Ref the History entry should link to.
+  SpreadsheetApp.flush();
+  const newRow = findTreeRowByLatLng(sheet, data.lat, data.lng);
+  const newRef = newRow ? sheet.getRange(newRow.rowNum, newRow.refCol).getValue() : '';
+  appendHistory('addTree', newRef, data.tree);
+
   return jsonResponse({ status: 'ok' });
 }
 
@@ -208,6 +237,29 @@ function findTreeRow(sheet, ref) {
   return null;
 }
 
+// ── Locate a tree row by Latitude/Longitude ───────────────────────────────────
+// Used only right after handleAddTree appends a row, to read back the Ref
+// an ARRAYFORMULA has just computed for it (see handleAddTree). Matching on
+// coordinates rather than re-implementing the Ref formula's own math here
+// keeps this decoupled from whatever formula a given adopter's template uses.
+function findTreeRowByLatLng(sheet, lat, lng) {
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const latCol = headers.indexOf('Latitude') + 1;
+  const lngCol = headers.indexOf('Longitude') + 1;
+  const refCol = headers.indexOf('Ref') + 1;
+  if (!latCol || !lngCol || !refCol) return null;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 3) return null;
+  const vals = sheet.getRange(3, 1, lastRow - 2, sheet.getLastColumn()).getValues();
+  for (let i = 0; i < vals.length; i++) {
+    if (parseFloat(vals[i][latCol - 1]) === parseFloat(lat) &&
+        parseFloat(vals[i][lngCol - 1]) === parseFloat(lng)) {
+      return { rowNum: i + 3, refCol: refCol };
+    }
+  }
+  return null;
+}
+
 // ── Append photos to an existing tree ─────────────────────────────────────────
 // Used when a contributor adds a photo to a tree from inside its popup.
 // Identifies the row by Ref and appends the new paths to the Photos cell.
@@ -233,6 +285,7 @@ function handleAppendPhotos(data) {
     }
     const next = existing.concat(data.paths).join(', ');
     cell.setValue(next);
+    appendHistory('appendPhotos', data.ref, data.tree, data.paths.length);
     return jsonResponse({ status: 'ok', photos: next });
   } finally {
     lock.releaseLock();
@@ -309,6 +362,7 @@ function handleDeletePhoto(data) {
       : [];
     const next = remaining.join(', ');
     cell.setValue(next);
+    appendHistory('deletePhoto', data.ref, data.tree);
     return jsonResponse({ status: 'ok', photos: next });
   } finally {
     lock.releaseLock();
@@ -344,6 +398,7 @@ function handleEditTree(data) {
   set('Year died',         data.year_died);
   set('Form',              data.form_field);
   set('Condition',         data.condition);
+  appendHistory('editTree', data.ref, data.tree);
   return jsonResponse({ status: 'ok' });
 }
 
@@ -370,6 +425,41 @@ function handleRepositionTree(data) {
   };
   set('Latitude',  lat);
   set('Longitude', lng);
+
+  // Ref is derived from Lat/Lng (see appendHistory call below), so this
+  // tree's Ref just changed. Flush, then re-read it at the same row — the
+  // row itself hasn't moved, only the formula's output has.
+  SpreadsheetApp.flush();
+  const refCol = headers.indexOf('Ref') + 1;
+  const newRef = refCol ? sheet.getRange(row.rowNum, refCol).getValue() : '';
+
+  // Keep this tree's whole History chain pointing at wherever it currently
+  // is: rewrite every existing History row that recorded the pre-move Ref
+  // (data.ref) to the new one. Since this is the only code path that ever
+  // changes a Ref, and each reposition advances everything currently
+  // tagged with the immediately-preceding value, earlier entries (from
+  // before an even earlier reposition) stay correctly linked too. This
+  // doesn't self-heal if data.ref was already stale (e.g. two repositions
+  // of the same tree from different unrefreshed sessions) — same
+  // staleness limitation every findTreeRow-based handler already has.
+  const historySheet = ss.getSheetByName(HISTORY_SHEET);
+  if (historySheet && newRef) {
+    const hLastRow = historySheet.getLastRow();
+    if (hLastRow > 1) {
+      const hHeaders = historySheet.getRange(1, 1, 1, historySheet.getLastColumn()).getValues()[0];
+      const hRefCol = hHeaders.indexOf('Ref') + 1;
+      if (hRefCol) {
+        const hRefs = historySheet.getRange(2, hRefCol, hLastRow - 1, 1).getValues();
+        for (let i = 0; i < hRefs.length; i++) {
+          if (String(hRefs[i][0]) === String(data.ref)) {
+            historySheet.getRange(i + 2, hRefCol).setValue(newRef);
+          }
+        }
+      }
+    }
+  }
+
+  appendHistory('repositionTree', newRef, data.tree);
   return jsonResponse({ status: 'ok' });
 }
 
@@ -412,6 +502,7 @@ function handleDeleteTree(data) {
     }
     // Delete the tree row.
     sheet.deleteRow(row.rowNum);
+    appendHistory('deleteTree', data.ref, data.tree);
     return jsonResponse({ status: 'ok' });
   } finally {
     lock.releaseLock();

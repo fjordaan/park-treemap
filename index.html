@@ -144,6 +144,76 @@
       #map-dim.active { display: block; }
     }
 
+    /* ── History panel — independent of the Filters panel above, but copies
+       its show/hide + mobile-dim mechanics exactly. ── */
+    #history-panel {
+      position: absolute;
+      top: 0; right: 0; bottom: 0;
+      z-index: 1000;
+      background: white;
+      border-left: 2px solid rgba(0,0,0,0.18);
+      padding: 12px;
+      width: 300px;
+      overflow-y: auto;
+      box-shadow: -2px 0 8px rgba(0,0,0,0.15);
+      display: none;
+    }
+    #history-panel.open { display: block; }
+    @media (max-width: 767px) {
+      #history-panel { padding-bottom: 50px; }
+    }
+    #history-panel-header {
+      position: sticky;
+      top: -12px;
+      margin: -12px -12px 12px;
+      padding: 10px 12px;
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 1;
+    }
+    #history-panel-header h3 { font-size: 14px; margin: 0; }
+    #history-panel-close {
+      background: none; border: none; cursor: pointer;
+      font-size: 20px; line-height: 1; color: #555; padding: 0;
+    }
+    #history-panel-close:hover { color: #000; }
+    #history-dim {
+      display: none;
+      position: absolute;
+      inset: 0;
+      z-index: 999;
+      background: rgba(0,0,0,0.25);
+      cursor: pointer;
+    }
+    @media (max-width: 767px) {
+      #history-dim.active { display: block; }
+    }
+    .history-day-heading {
+      font-size: 11px;
+      font-weight: bold;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin: 16px 0 6px;
+    }
+    .history-day-heading:first-child { margin-top: 0; }
+    .history-entry {
+      font-size: 13px;
+      color: #333;
+      padding: 6px 0;
+      border-top: 1px solid #f0f0f0;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .history-entry:first-child { border-top: none; }
+    .history-entry .history-icon { flex-shrink: 0; margin-top: 1px; color: #888; }
+    .history-entry a { color: #2a7ae2; }
+    .history-empty { font-size: 13px; color: #888; padding: 12px 0; }
+
     .add-tree-btns {
       display: flex;
       gap: 6px;
@@ -1157,6 +1227,7 @@
     <div class="info-row" id="info-contact-row">Contact: <a id="info-contact" href="#"></a></div>
     <div class="info-row" id="info-sheet-row">Tree spreadsheet: <a id="info-sheet" href="#" target="_blank" rel="noopener">open in Google Sheets</a></div>
     <div class="info-row" id="info-enrol-row">Want to add trees from this device? <a href="#" onclick="enrolDeviceManually(); return false;">Enrol this device</a></div>
+    <div class="info-row" id="info-history-row"><a href="#" onclick="openHistoryPanel(); closeInfoModal(); return false;">View edit history</a></div>
     <div id="info-attribution">
       Built with <a href="https://parktreemap.org/" target="_blank" rel="noopener">park-treemap</a> — a free, self-hosted tree-map template for any park's "Friends of" group.
     </div>
@@ -1183,6 +1254,18 @@
   <input type="file" accept="image/*" capture="environment" id="popup-photo-capture" hidden>
 
   <button id="panel-toggle" onclick="togglePanel()">&#9658; Filters</button>
+
+  <!-- History panel: a second, independent panel (not a mode of #panel
+       above) — opened only via the "View edit history" link in the Info
+       modal, no always-visible toggle button of its own. -->
+  <div id="history-dim" onclick="closeHistoryPanel()"></div>
+  <div id="history-panel">
+    <div id="history-panel-header">
+      <h3>History</h3>
+      <button id="history-panel-close" onclick="closeHistoryPanel()" aria-label="Close">&times;</button>
+    </div>
+    <div id="history-list"></div>
+  </div>
 
   <div id="panel">
     <div id="panel-header">
@@ -1687,6 +1770,171 @@
     return document.getElementById('info-modal').classList.contains('open');
   }
 
+  // ── History panel ────────────────────────────────────────────────────────────
+  // A second, independent panel (not a mode of the Filters #panel) — copies
+  // its show/hide + mobile-dim mechanics, but uses explicit open/close/is-open
+  // functions like the Info modal above, since the Info-modal link needs to
+  // guarantee open rather than toggle.
+  // `panel-open` on <body> (used to hide .map-header on mobile) reflects
+  // whether *either* panel is open — recomputed, not independently
+  // set/cleared by each panel, since both can be open at once on desktop.
+  function updatePanelOpenBodyClass() {
+    const anyOpen = document.getElementById('panel').classList.contains('open') ||
+                    document.getElementById('history-panel').classList.contains('open');
+    document.body.classList.toggle('panel-open', anyOpen);
+  }
+
+  function openHistoryPanel() {
+    // Only one panel fits on a narrow screen — mirror togglePanel's own
+    // mobile-only mutual exclusion below.
+    if (window.innerWidth <= 767 && document.getElementById('panel').classList.contains('open')) {
+      togglePanel();
+    }
+    document.getElementById('history-panel').classList.add('open');
+    document.getElementById('history-dim').classList.add('active');
+    updatePanelOpenBodyClass();
+    loadHistoryOnce();
+  }
+
+  function closeHistoryPanel() {
+    document.getElementById('history-panel').classList.remove('open');
+    document.getElementById('history-dim').classList.remove('active');
+    updatePanelOpenBodyClass();
+  }
+
+  function toggleHistoryPanel() {
+    if (isHistoryPanelOpen()) closeHistoryPanel(); else openHistoryPanel();
+  }
+
+  function isHistoryPanelOpen() {
+    return document.getElementById('history-panel').classList.contains('open');
+  }
+
+  // `tree` arrives pre-built (either a link around just the tree name, or
+  // plain escaped text for the no-link cases) — see renderHistory.
+  const HISTORY_PHRASES = {
+    addTree:        (tree) => `Added ${tree}`,
+    editTree:       (tree) => `Edited ${tree}`,
+    deleteTree:     (tree) => `Deleted ${tree}`,        // never a link
+    repositionTree: (tree) => `Repositioned ${tree}`,
+    appendPhotos:   (tree, count) => count > 1 ? `Added ${count} photos to ${tree}` : `Added photo to ${tree}`,
+    deletePhoto:    (tree) => `Deleted photo from ${tree}` // always singular — the server only ever deletes one at a time
+  };
+
+  // Same Feather-icon style already used throughout the app (viewBox 0 0 24
+  // 24, stroke-based, round caps/joins) — edit-2 and trash-2 are the exact
+  // SVGs already used for the popup's edit button and per-photo delete
+  // button, reused here for visual consistency.
+  const HISTORY_ICON_PATHS = {
+    addTree:        '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>',
+    editTree:       '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
+    deleteTree:     '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>',
+    repositionTree: '<polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/>',
+    appendPhotos:   '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+    deletePhoto:    '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>'
+  };
+
+  function historyIconSvg(action) {
+    const path = HISTORY_ICON_PATHS[action];
+    if (!path) return '';
+    return `<svg class="history-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+  }
+
+  let historyLoaded = false;
+
+  // Fetches and parses the History sheet lazily, the first time the panel
+  // opens — not on page load, so visitors who never open History never pay
+  // for the extra request.
+  async function loadHistoryOnce() {
+    const list = document.getElementById('history-list');
+    if (historyLoaded) return;
+    list.innerHTML = withSpinner('Loading…');
+    try {
+      const resp = await fetch(HISTORY_CSV_URL);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const text = await resp.text();
+      const rows = parseCSV(text);
+      if (rows.length < 2) {
+        list.innerHTML = '<div class="history-empty">No history yet.</div>';
+        historyLoaded = true;
+        return;
+      }
+      const headers = rows[0].map(h => h.trim());
+      const entries = rows.slice(1)
+        .map(row => {
+          const obj = {};
+          headers.forEach((h, i) => { obj[h] = (row[i] || '').trim(); });
+          return obj;
+        })
+        .filter(e => e['Timestamp'] && e['Action']);
+      renderHistory(entries);
+      historyLoaded = true;
+    } catch (err) {
+      console.warn('Could not load history:', err);
+      list.innerHTML = '<div class="history-empty">Could not load history.</div>';
+    }
+  }
+
+  function historyDayHeading(date) {
+    const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diffDays = Math.round((startOfDay(new Date()) - startOfDay(date)) / 86400000);
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+  }
+
+  function renderHistory(entries) {
+    const list = document.getElementById('history-list');
+    if (!entries.length) {
+      list.innerHTML = '<div class="history-empty">No history yet.</div>';
+      return;
+    }
+    // Sheet rows are appended in chronological order — reverse for
+    // reverse-chronological display, then group by calendar day.
+    const reversed = [...entries].reverse();
+    let html = '';
+    let lastHeading = null;
+    for (const entry of reversed) {
+      const date = new Date(entry['Timestamp']);
+      const heading = isNaN(date) ? 'Unknown date' : historyDayHeading(date);
+      if (heading !== lastHeading) {
+        html += `<div class="history-day-heading">${esc(heading)}</div>`;
+        lastHeading = heading;
+      }
+      const action = entry['Action'];
+      const phraseFn = HISTORY_PHRASES[action];
+      const label = esc(entry['Tree'] || '(unknown)');
+      const count = parseInt(entry['Count'], 10) || 1;
+      const ref = entry['Ref'];
+      let treeHtml;
+      if (action !== 'deleteTree' && ref) {
+        // Matches the same JS-string-escaping convention buildPopup already
+        // uses for Ref values (numeric/lat-lng-derived, never HTML-escaped).
+        const refJs = ref.replace(/'/g, "\\'");
+        treeHtml = `<a href="#" onclick="focusTreeFromHistory('${refJs}'); return false;">${label}</a>`;
+      } else {
+        treeHtml = label;
+      }
+      const text = phraseFn ? phraseFn(treeHtml, count) : `${esc(action)}: ${treeHtml}`;
+      html += `<div class="history-entry">${historyIconSvg(action)}<span>${text}</span></div>`;
+    }
+    list.innerHTML = html;
+  }
+
+  // Called from a History entry's tree-name link. The Ref may no longer
+  // resolve (e.g. stale after a reposition that predates this feature, or a
+  // tree deleted since) — fail gracefully with a toast rather than a dead
+  // link with no feedback.
+  function focusTreeFromHistory(ref) {
+    const found = focusTreeByRef(ref);
+    if (!found) {
+      showToast('This tree may have been moved or removed.');
+      return;
+    }
+    if (window.innerWidth <= 767) closeHistoryPanel();
+  }
+
   // ── CSV PARSER ───────────────────────────────────────────────────────────────
   // Handles quoted fields (RFC 4180), CRLF and LF line endings.
   function parseCSV(text) {
@@ -1897,6 +2145,13 @@
   }
 
   // ── POPUP ────────────────────────────────────────────────────────────────────
+  // Human-readable label for a tree, used wherever one's needed outside the
+  // popup itself (e.g. History log entries) — same fallback convention as
+  // buildPopup's own header below.
+  function treeLabel(tree) {
+    return tree['Scientific name'] || tree['Common name'] || '(unknown)';
+  }
+
   function buildPopup(tree) {
     // Returns a line "Label: <b>Value</b> suffix" or '' if value is empty.
     const row = (label, value, suffix = '') =>
@@ -2482,7 +2737,9 @@
     toggle.classList.toggle('collapsed', !open);
     toggle.textContent = open ? '\u25b6 Filters' : '\u25c0 Filters';
     document.getElementById('map-dim').classList.toggle('active', open);
-    document.body.classList.toggle('panel-open', open);
+    // Only one panel fits on a narrow screen.
+    if (open && window.innerWidth <= 767 && isHistoryPanelOpen()) closeHistoryPanel();
+    updatePanelOpenBodyClass();
   }
 
   // \u2500\u2500 WELCOME OVERLAY (empty-state) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -2532,6 +2789,10 @@
 
   // ── MAP SETUP ────────────────────────────────────────────────────────────────
   const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&sheet=${encodeURIComponent(SHEET_NAME)}`;
+  // The History sheet is a separate tab, created on first use by the Apps
+  // Script backend (see apps-script.gs). Already covered by the same
+  // "Anyone with the link" sharing as every other tab — no extra setup.
+  const HISTORY_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&sheet=${encodeURIComponent('History')}`;
 
   const baseLayers = {
     'Street map': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -2578,6 +2839,19 @@
 
   // Map<treeObject, L.Marker>
   const markers = new Map();
+
+  // Pan/zoom to a tree by Ref and open its popup. Used both for ?ref= link
+  // sharing (loadData, below) and for History panel tree-name links.
+  function focusTreeByRef(ref) {
+    for (const [tree, marker] of markers) {
+      if (tree['Ref'] === ref) {
+        map.setView(marker.getLatLng(), Math.max(map.getZoom(), 18));
+        marker.openPopup();
+        return true;
+      }
+    }
+    return false;
+  }
 
   const parkMarkerLayer = L.layerGroup();
   const PARK_ZOOM_THRESHOLD = 19;  // dot visible below this zoom level
@@ -2687,15 +2961,7 @@
     if (!silent) {
       // Open popup for a specific tree if ?ref= is in the URL
       const refParam = new URLSearchParams(window.location.search).get('ref');
-      if (refParam) {
-        for (const [tree, marker] of markers) {
-          if (tree['Ref'] === refParam) {
-            map.setView(marker.getLatLng(), Math.max(map.getZoom(), 18));
-            marker.openPopup();
-            break;
-          }
-        }
-      }
+      if (refParam) focusTreeByRef(refParam);
     }
 
     if (!silent) applyFilters();
@@ -3543,21 +3809,23 @@
     });
   }
 
-  function appendPhotosToScript(ref, paths) {
+  function appendPhotosToScript(ref, paths, tree) {
     return postToScript({
       action: 'appendPhotos',
       token: readContributorToken(),
       ref,
-      paths
+      paths,
+      tree
     });
   }
 
-  function deletePhotoFromScript(ref, path) {
+  function deletePhotoFromScript(ref, path, tree) {
     return postToScript({
       action: 'deletePhoto',
       token: readContributorToken(),
       ref,
-      path
+      path,
+      tree
     });
   }
 
@@ -3573,7 +3841,7 @@
     markers.forEach((_marker, t) => { if (!tree && t['Ref'] === ref) tree = t; });
     if (!tree) return;
     try {
-      await deletePhotoFromScript(ref, path);
+      await deletePhotoFromScript(ref, path, treeLabel(tree));
     } catch (err) {
       console.warn('deletePhoto failed:', err);
       showToast('Failed to remove photo: ' + err.message);
@@ -3690,7 +3958,7 @@
     markers.forEach((_marker, t) => { if (!tree && t['Ref'] === ref) tree = t; });
     if (!tree) return;
     try {
-      await postToScript({ action: 'deleteTree', token: readContributorToken(), ref });
+      await postToScript({ action: 'deleteTree', token: readContributorToken(), ref, tree: treeLabel(tree) });
     } catch (err) {
       console.warn('deleteTree failed:', err);
       showToast('Failed to delete tree: ' + err.message);
@@ -3713,12 +3981,14 @@
     btn.disabled = true;
     status.innerHTML = withSpinner('Saving…');
 
+    const sciVal = form.elements['sci'].value.trim();
+    const comVal = form.elements['common'].value.trim();
     const payload = {
       action:           'editTree',
       token:            readContributorToken(),
       ref,
-      sci:              form.elements['sci'].value.trim(),
-      common:           form.elements['common'].value.trim(),
+      sci:              sciVal,
+      common:           comVal,
       short_name:       form.elements['short_name'].value.trim(),
       other_names:      form.elements['other_names'].value.trim(),
       tags:             tagifyEditTags      ? tagifyEditTags.value.map(t => t.value).join(', ')          : '',
@@ -3727,7 +3997,10 @@
       est_year_planted: form.elements['est_year_planted'].value.trim(),
       year_died:        form.elements['year_died'].value.trim(),
       form_field:       tagifyEditFormField ? (tagifyEditFormField.value[0] || {}).value || ''            : '',
-      condition:        tagifyEditCondition ? (tagifyEditCondition.value[0] || {}).value || ''            : ''
+      condition:        tagifyEditCondition ? (tagifyEditCondition.value[0] || {}).value || ''            : '',
+      // Post-edit name, so the History entry matches the tree as it'll
+      // appear when its link is clicked.
+      tree:             sciVal || comVal || '(unknown)'
     };
 
     try {
@@ -3833,7 +4106,7 @@
     }
 
     if (newPaths.length) {
-      try { await appendPhotosToScript(ref, newPaths); }
+      try { await appendPhotosToScript(ref, newPaths, treeLabel(tree)); }
       catch (err) { console.warn('appendPhotos failed:', err); }
       // Optimistically update the in-memory tree and re-render the popup.
       const merged = existing.concat(newPaths).join(', ');
@@ -3915,20 +4188,23 @@
       }
     }
 
+    const addSciVal = form.elements['sci'].value.trim();
+    const addComVal = form.elements['common'].value.trim();
     const payload = {
       action:           'addTree',
       token:            readContributorToken(),
       lat,
       lng,
-      sci:              form.elements['sci'].value.trim(),
-      common:           form.elements['common'].value.trim(),
+      sci:              addSciVal,
+      common:           addComVal,
       tags:             tagifyInstance  ? tagifyInstance.value.map(t => t.value).join(', ') : '',
       notes:            form.elements['notes'].value.trim(),
       year_planted:     form.elements['year_planted'].value.trim(),
       est_year_planted: form.elements['est_year_planted'].value.trim(),
       form_field:       tagifyFormField ? (tagifyFormField.value[0] || {}).value || '' : '',
       condition:        tagifyCondition ? (tagifyCondition.value[0] || {}).value || '' : '',
-      photos:           photoPaths.join(', ')
+      photos:           photoPaths.join(', '),
+      tree:             addSciVal || addComVal || '(unknown)'
     };
     status.innerHTML = withSpinner('Submitting…');
     try {
@@ -3976,7 +4252,7 @@
       marker.setLatLng([parseFloat(lat), parseFloat(lng)]);
       tree['Latitude']  = lat;
       tree['Longitude'] = lng;
-      postToScript({ action: 'repositionTree', token: readContributorToken(), ref, lat, lng })
+      postToScript({ action: 'repositionTree', token: readContributorToken(), ref, lat, lng, tree: treeLabel(tree) })
         .then(() => showToast('Tree repositioned.'))
         .catch(err => {
           console.warn('repositionTree failed:', err);
@@ -3988,6 +4264,7 @@
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
     if (isInfoModalOpen())             { closeInfoModal(); return; }
+    if (isHistoryPanelOpen())          { closeHistoryPanel(); return; }
     if (isPickerOpen())                { closePicker(); return; }
     if (isEditTreeModalOpen())         { closeEditTreeModal(); return; }
     if (addTreeState === 'modal-open') { closeAddTreeModal(); return; }
