@@ -4107,6 +4107,7 @@
 
     const tok = 't-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
     const newPaths = [];
+    let uploadFailures = 0;
     for (let i = 0; i < accepted.length; i++) {
       setPopupStatus(`Uploading photo ${i + 1} of ${accepted.length}…`, true);
       try {
@@ -4116,16 +4117,31 @@
         newPaths.push(`photos/${filename}`);
       } catch (err) {
         console.warn('Popup photo upload failed:', err);
+        uploadFailures++;
       }
     }
 
     if (newPaths.length) {
-      try { await appendPhotosToScript(ref, newPaths, treeLabel(tree)); }
-      catch (err) { console.warn('appendPhotos failed:', err); }
-      // Optimistically update the in-memory tree and re-render the popup.
+      try {
+        await appendPhotosToScript(ref, newPaths, treeLabel(tree));
+      } catch (err) {
+        // The files uploaded above are on GitHub, but the sheet was never
+        // updated to point at them — don't show photos the tree doesn't
+        // actually have yet. The popup reverts to its last-known-good state
+        // rather than a view the server never confirmed.
+        console.warn('appendPhotos failed:', err);
+        setPopupStatus('Could not save the new photo(s). Please try again.');
+        popupPhotoBusy = false;
+        return;
+      }
+      // Only now, with the server confirming the save, update the in-memory
+      // tree and re-render the popup.
       const merged = existing.concat(newPaths).join(', ');
       tree['Photos'] = merged;
       if (popup) popup.setContent(buildPopup(tree));
+      if (uploadFailures) {
+        showToast(`${newPaths.length} photo${newPaths.length > 1 ? 's' : ''} added, but ${uploadFailures} failed to upload.`);
+      }
     } else {
       setPopupStatus('Upload failed. Please try again.');
     }
