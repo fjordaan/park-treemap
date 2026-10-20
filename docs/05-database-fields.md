@@ -133,6 +133,17 @@ overwritten. Fix:
 Only the **single cell at row 2** holds the formula — don't paste it
 down into other rows; that breaks the array projection.
 
+## Keep the Trees tab first
+
+The map reads the `Trees` tab's data by its **position** (the first tab in
+the spreadsheet), not by its name — so the `Trees` tab must stay the
+leftmost tab. If you add other tabs of your own (e.g. a `Summary` tab),
+add them *after* `Trees`, never before it.
+
+This doesn't apply to any other tab: `Feedback` and `History` (both
+created automatically) can move anywhere relative to each other or to
+tabs you add yourself — only `Trees`' position matters.
+
 ## Keeping the sheet sorted
 
 The sheet is much easier to read when it's sorted by Scientific name. The
