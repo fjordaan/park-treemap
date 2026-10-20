@@ -2806,7 +2806,16 @@
   // The History sheet is a separate tab, created on first use by the Apps
   // Script backend (see apps-script.gs). Already covered by the same
   // "Anyone with the link" sharing as every other tab — no extra setup.
-  const HISTORY_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&sheet=${encodeURIComponent('History')}`;
+  //
+  // Deliberately NOT the same /export?...&sheet= URL shape as CSV_URL above:
+  // that endpoint silently ignores the sheet name and always returns the
+  // first tab (gid 0) — CSV_URL only "works" because Trees happens to be
+  // first. The /gviz/tq endpoint genuinely selects by name, which History
+  // (being a later tab) actually needs. Not used for CSV_URL itself because
+  // gviz's smarter auto-detection gets confused by the Trees sheet's row 2
+  // (reserved for the Ref/Google Maps link ARRAYFORMULA cells), corrupting
+  // the headers.
+  const HISTORY_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('History')}`;
 
   const baseLayers = {
     'Street map': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
