@@ -1135,6 +1135,11 @@
       font-size: 12px; color: #888; text-align: center;
     }
     #info-attribution a { color: #2a7ae2; }
+    #info-history-row {
+      margin-top: 12px;
+      font-size: 12px; color: #888; text-align: center;
+    }
+    #info-history-row a { color: #2a7ae2; }
 
     /* ── MAP LOADING INDICATOR (shown while the first tree-data fetch is in flight) ── */
     #map-loading {
@@ -1227,10 +1232,10 @@
     <div class="info-row" id="info-contact-row">Contact: <a id="info-contact" href="#"></a></div>
     <div class="info-row" id="info-sheet-row">Tree spreadsheet: <a id="info-sheet" href="#" target="_blank" rel="noopener">open in Google Sheets</a></div>
     <div class="info-row" id="info-enrol-row">Want to add trees from this device? <a href="#" onclick="enrolDeviceManually(); return false;">Enrol this device</a></div>
-    <div class="info-row" id="info-history-row"><a href="#" onclick="openHistoryPanel(); closeInfoModal(); return false;">View edit history</a></div>
     <div id="info-attribution">
       Built with <a href="https://parktreemap.org/" target="_blank" rel="noopener">park-treemap</a> — a free, self-hosted tree-map template for any park's "Friends of" group.
     </div>
+    <div id="info-history-row"><a href="#" onclick="openHistoryPanel(); closeInfoModal(); return false;">Edit history</a></div>
   </div>
 
   <div id="welcome-overlay">
@@ -1775,9 +1780,13 @@
   // its show/hide + mobile-dim mechanics, but uses explicit open/close/is-open
   // functions like the Info modal above, since the Info-modal link needs to
   // guarantee open rather than toggle.
+  // Both panels dock at the same position/width, so only one is ever open at
+  // a time — opening either one closes the other, on any screen width (not
+  // just mobile).
   // `panel-open` on <body> (used to hide .map-header on mobile) reflects
-  // whether *either* panel is open — recomputed, not independently
-  // set/cleared by each panel, since both can be open at once on desktop.
+  // whether *either* panel is open — recomputed rather than independently
+  // set/cleared by each panel, since that's simpler than tracking exclusivity
+  // in two places.
   function updatePanelOpenBodyClass() {
     const anyOpen = document.getElementById('panel').classList.contains('open') ||
                     document.getElementById('history-panel').classList.contains('open');
@@ -1785,13 +1794,17 @@
   }
 
   function openHistoryPanel() {
-    // Only one panel fits on a narrow screen — mirror togglePanel's own
-    // mobile-only mutual exclusion below.
-    if (window.innerWidth <= 767 && document.getElementById('panel').classList.contains('open')) {
+    // Both panels dock at the same position/width, so Filters has to close
+    // first — on any screen width, not just mobile (mirrors togglePanel's
+    // own exclusion below).
+    if (document.getElementById('panel').classList.contains('open')) {
       togglePanel();
     }
     document.getElementById('history-panel').classList.add('open');
     document.getElementById('history-dim').classList.add('active');
+    // The Filters toggle button floats over the same top-right corner as
+    // History's own close button — hide it while History is open.
+    document.getElementById('panel-toggle').style.display = 'none';
     updatePanelOpenBodyClass();
     loadHistoryOnce();
   }
@@ -1799,6 +1812,7 @@
   function closeHistoryPanel() {
     document.getElementById('history-panel').classList.remove('open');
     document.getElementById('history-dim').classList.remove('active');
+    document.getElementById('panel-toggle').style.display = '';
     updatePanelOpenBodyClass();
   }
 
@@ -2737,8 +2751,8 @@
     toggle.classList.toggle('collapsed', !open);
     toggle.textContent = open ? '\u25b6 Filters' : '\u25c0 Filters';
     document.getElementById('map-dim').classList.toggle('active', open);
-    // Only one panel fits on a narrow screen.
-    if (open && window.innerWidth <= 767 && isHistoryPanelOpen()) closeHistoryPanel();
+    // Both panels dock at the same position/width, so only one is ever open.
+    if (open && isHistoryPanelOpen()) closeHistoryPanel();
     updatePanelOpenBodyClass();
   }
 
