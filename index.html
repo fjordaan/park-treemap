@@ -2866,8 +2866,16 @@
   // Pan/zoom to a tree by Ref and open its popup. Used both for ?ref= link
   // sharing (loadData, below) and for History panel tree-name links.
   function focusTreeByRef(ref) {
+    // Numeric comparison, not string equality: Ref is fundamentally a
+    // number, and Trees' custom 5-decimal number format can pad it with a
+    // trailing zero (e.g. "48409.20750") that doesn't survive a write to
+    // the History sheet's plainer Ref column (e.g. "48409.2075") — the two
+    // are the same tree, just formatted differently depending on which
+    // sheet/export path produced the string.
+    const target = parseFloat(ref);
+    if (isNaN(target)) return false;
     for (const [tree, marker] of markers) {
-      if (tree['Ref'] === ref) {
+      if (parseFloat(tree['Ref']) === target) {
         map.setView(marker.getLatLng(), Math.max(map.getZoom(), 18));
         marker.openPopup();
         return true;
