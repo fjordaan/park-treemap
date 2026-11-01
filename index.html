@@ -3213,6 +3213,20 @@
     lbIndex  = index;
     showLightboxPhoto();
     document.getElementById('lightbox').classList.add('open');
+    preloadOtherLightboxPhotos();
+  }
+
+  // Warms the browser's HTTP cache for this tree's other photos while the
+  // visitor is looking at the current one, so stepping to them later is
+  // instant instead of showing the same load delay again. At most 3 extra
+  // requests (tree photos are capped at 4), so no need to limit to neighbours.
+  function preloadOtherLightboxPhotos() {
+    lbPhotos.forEach((raw, i) => {
+      if (i === lbIndex) return;
+      const img = new Image();
+      img.referrerPolicy = 'no-referrer';
+      img.src = resolvePhotoUrl(raw, 'w1600');
+    });
   }
 
   function lbSetOverlaysFixed(fixed) {
