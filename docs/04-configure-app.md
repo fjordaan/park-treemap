@@ -116,13 +116,21 @@ The `icons/` folder ships with a generic tree silhouette so the map works
 straight away. Most adopters will want to replace it with something that
 reflects their park — for example a logo, or a photo of a notable tree.
 
-To swap them out:
+To swap them out, open the [icon generator](https://claude.ai/code/artifact/adb843e5-66f7-4fa5-bc39-d9bfaf079e7d)
+and choose one of two tabs:
 
-1. Make a square PNG at **512×512** (this is the source image).
-2. Use the [icon generator](https://claude.ai/code/artifact/adb843e5-66f7-4fa5-bc39-d9bfaf079e7d)
-   to resize it into the four files listed below.
-3. In GitHub, navigate to `icons/`, click **Add file → Upload files**, and
-   drop in the new files, replacing the existing ones.
+- **Resize an image** — if you already have a logo or photo you like, drop
+  it in. Any size or shape works; it's centre-cropped to a square for you.
+- **Use the icon template** — if you don't have anything ready-made, add
+  any background photo plus your park's initials (e.g. "NP"). The tool
+  composites them into a branded icon design — a green outline and
+  lettering, matching the rest of the kit's look — with no image editing
+  required.
+
+Either way, the tool generates the four files listed below, sized to spec,
+right in your browser. Then: in GitHub, navigate to `icons/`, click
+**Add file → Upload files**, and drop in the new files, replacing the
+existing ones.
 
 The four files:
 
