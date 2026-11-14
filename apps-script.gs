@@ -10,6 +10,7 @@
  *   6. action: 'editTree'        → updates editable fields of an existing tree row
  *   7. action: 'deleteTree'      → deletes a tree's repo photos and removes its spreadsheet row
  *   8. action: 'repositionTree'  → updates the Latitude and Longitude of an existing tree
+ *   9. action: 'reorderPhotos'   → rewrites the order of paths in an existing tree's Photos cell
  *
  * Every action above except 'uploadPhoto' and 'validateToken' also appends a
  * row to the History sheet (created on first use) — see appendHistory().
@@ -76,6 +77,7 @@ function doPost(e) {
       case 'uploadPhoto':   return requireContributorToken(data) || handleUploadPhoto(data);
       case 'appendPhotos':  return requireContributorToken(data) || handleAppendPhotos(data);
       case 'deletePhoto':   return requireContributorToken(data) || handleDeletePhoto(data);
+      case 'reorderPhotos': return requireContributorToken(data) || handleReorderPhotos(data);
       case 'editTree':          return requireContributorToken(data) || handleEditTree(data);
       case 'deleteTree':        return requireContributorToken(data) || handleDeleteTree(data);
       case 'repositionTree':    return requireContributorToken(data) || handleRepositionTree(data);
@@ -280,9 +282,6 @@ function handleAppendPhotos(data) {
     const cell    = sheet.getRange(row.rowNum, row.photosCol);
     const current = String(cell.getValue() || '').trim();
     const existing = current ? current.split(',').map(s => s.trim()).filter(Boolean) : [];
-    if (existing.length + data.paths.length > 4) {
-      return jsonResponse({ status: 'error', message: 'Photo cap of 4 would be exceeded' });
-    }
     const next = existing.concat(data.paths).join(', ');
     cell.setValue(next);
     appendHistory('appendPhotos', data.ref, data.tree, data.paths.length);
@@ -393,6 +392,40 @@ function handleDeletePhoto(data) {
     const next = remaining.join(', ');
     cell.setValue(next);
     appendHistory('deletePhoto', data.ref, data.tree);
+    return jsonResponse({ status: 'ok', photos: next });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ── Reorder an existing tree's photos ─────────────────────────────────────────
+// Rewrites the Photos cell to data.order, which must be exactly a permutation
+// of what's there now — this guards against a stale client (an add/delete
+// that landed in between the lightbox opening and the drag finishing)
+// silently losing or duplicating a photo.
+function handleReorderPhotos(data) {
+  if (!data.ref || !Array.isArray(data.order) || data.order.length === 0) {
+    return jsonResponse({ status: 'error', message: 'Missing ref or order' });
+  }
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = SpreadsheetApp.openById(sheetId()).getSheetByName(TREES_SHEET);
+    if (!sheet) return jsonResponse({ status: 'error', message: 'Sheet "' + TREES_SHEET + '" not found' });
+    const row = findTreeRow(sheet, data.ref);
+    if (row && row.error) return jsonResponse({ status: 'error', message: row.error });
+    if (!row) return jsonResponse({ status: 'error', message: 'Tree not found: ' + data.ref });
+    const cell    = sheet.getRange(row.rowNum, row.photosCol);
+    const current = String(cell.getValue() || '').trim();
+    const existing = current ? current.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const sameSet = existing.length === data.order.length &&
+      existing.slice().sort().join('\u0000') === data.order.slice().sort().join('\u0000');
+    if (!sameSet) {
+      return jsonResponse({ status: 'error', message: 'Photo list changed — please reopen and try again' });
+    }
+    const next = data.order.join(', ');
+    cell.setValue(next);
+    appendHistory('reorderPhotos', data.ref, data.tree);
     return jsonResponse({ status: 'ok', photos: next });
   } finally {
     lock.releaseLock();

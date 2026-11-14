@@ -408,7 +408,6 @@
       font-size: 12px; color: #444;
     }
     .add-tree-photo-btn:hover { background: #ececec; }
-    .add-tree-photo-btn.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
     .add-tree-actions { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
     #btn-add-tree-submit, #btn-edit-tree-submit {
       font-size: 13px; padding: 7px 18px; cursor: pointer;
@@ -888,6 +887,19 @@
       background: rgba(192, 57, 43, 0.9);
     }
     .tree-popup .photo-delete svg { display: block; }
+    .tree-popup .photo-overflow-badge {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.55);
+      color: white;
+      font-weight: 600;
+      font-size: 15px;
+      border-radius: 3px;
+      pointer-events: none;
+    }
     .tree-popup .photo-add-slot {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       gap: 4px;
@@ -940,6 +952,9 @@
     }
     #lightbox-grad-top    { top: 0;    background: linear-gradient(to bottom, rgba(0,0,0,0.55), transparent); }
     #lightbox-grad-bottom { bottom: 0; background: linear-gradient(to top,   rgba(0,0,0,0.55), transparent); }
+    #lightbox-controls {
+      width: 100%;
+    }
     #lightbox-bar {
       display: flex;
       align-items: center;
@@ -950,7 +965,7 @@
       box-sizing: border-box;
     }
     @media (max-width: 767px) {
-      #lightbox-bar {
+      #lightbox-controls {
         position: absolute;
         bottom: 0;
         left: 0;
@@ -972,6 +987,28 @@
     #lightbox-bar button:hover, #lightbox-bar a:hover { background: rgba(255,255,255,0.15); }
     #lightbox-bar .nav { font-size: 20px; padding: 3px 14px; }
     #lightbox-bar .nav:disabled { opacity: 0.25; cursor: default; }
+    #lightbox-thumbs {
+      display: flex;
+      gap: 6px;
+      padding: 0 16px 8px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    #lightbox-thumbs:empty { display: none; }
+    #lightbox-thumbs .lightbox-thumb {
+      flex: 0 0 auto;
+      width: 48px;
+      height: 48px;
+      object-fit: cover;
+      border-radius: 4px;
+      opacity: 0.6;
+      border: 2px solid transparent;
+      cursor: grab;
+      touch-action: none;
+      -webkit-user-drag: none;
+    }
+    #lightbox-thumbs .lightbox-thumb.active { opacity: 1; border-color: white; }
+    #lightbox-thumbs .lightbox-thumb.dragging { opacity: 0.9; cursor: grabbing; position: relative; z-index: 1; }
     #lightbox-close-top {
       position: absolute;
       top: 12px;
@@ -1544,7 +1581,7 @@
         <textarea name="notes" rows="3" placeholder="Any observations…"></textarea>
       </label>
       <div class="add-tree-photos">
-        <div class="add-tree-photos-label">Photos (up to 4)</div>
+        <div class="add-tree-photos-label">Photos</div>
         <div class="add-tree-photo-thumbs" id="add-tree-photo-thumbs"></div>
         <div class="add-tree-photo-buttons">
           <label class="add-tree-photo-btn">
@@ -1664,12 +1701,18 @@
     <img id="lightbox-img" src="" referrerpolicy="no-referrer" alt="Tree photo" draggable="false" onclick="toggleLightboxZoom(event)"
          onload="document.getElementById('lightbox').classList.remove('loading')"
          onerror="if (!retryImgLoad(this)) document.getElementById('lightbox').classList.remove('loading')"/>
-    <div id="lightbox-bar">
-      <button class="nav" id="lightbox-prev" onclick="stepLightbox(-1)">&#8249;</button>
-      <a id="lightbox-open" href="" target="_blank" rel="noopener" referrerpolicy="no-referrer">
-        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:5px"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Open in new tab
-      </a>
-      <button class="nav" id="lightbox-next" onclick="stepLightbox(1)">&#8250;</button>
+    <div id="lightbox-controls">
+      <div id="lightbox-thumbs"></div>
+      <div id="lightbox-bar">
+        <button class="nav" id="lightbox-prev" onclick="stepLightbox(-1)">&#8249;</button>
+        <a id="lightbox-open" href="" target="_blank" rel="noopener" referrerpolicy="no-referrer">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:5px"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Open in new tab
+        </a>
+        <button id="lightbox-delete" title="Remove this photo" onclick="lightboxDeleteCurrentPhoto()" hidden>
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:5px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>Remove
+        </button>
+        <button class="nav" id="lightbox-next" onclick="stepLightbox(1)">&#8250;</button>
+      </div>
     </div>
   </div>
 
@@ -1980,7 +2023,8 @@
     deleteTree:     (tree) => `Deleted ${tree}`,        // never a link
     repositionTree: (tree) => `Repositioned ${tree}`,
     appendPhotos:   (tree, count) => count > 1 ? `Added ${count} photos to ${tree}` : `Added photo to ${tree}`,
-    deletePhoto:    (tree) => `Deleted photo from ${tree}` // always singular — the server only ever deletes one at a time
+    deletePhoto:    (tree) => `Deleted photo from ${tree}`, // always singular — the server only ever deletes one at a time
+    reorderPhotos:  (tree) => `Reordered photos for ${tree}`
   };
 
   // Same Feather-icon style already used throughout the app (viewBox 0 0 24
@@ -1993,7 +2037,8 @@
     deleteTree:     '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>',
     repositionTree: '<polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/>',
     appendPhotos:   '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
-    deletePhoto:    '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>'
+    deletePhoto:    '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
+    reorderPhotos:  '<path d="M3 7h13M3 7l3-3M3 7l3 3"/><path d="M21 17H8M21 17l-3-3M21 17l-3 3"/>'
   };
 
   function historyIconSvg(action) {
@@ -2293,6 +2338,12 @@
     return photoStr.split(',').map(s => s.trim()).filter(Boolean);
   }
 
+  // Only repo-hosted photos can be deleted/reordered via the Apps Script.
+  // External photos (Google Photos etc.) must be managed at their own host.
+  function isRepoPhoto(raw) {
+    return !!raw && !/^https?:\/\//i.test(raw);
+  }
+
   function esc(str) {
     return String(str)
       .replace(/&/g, '&amp;')
@@ -2343,23 +2394,27 @@
     `</div>`;
 
     const photos = parsePhotos(tree['Photos']);
-    const canAddPhoto = canContribute() && tree['Ref'] && photos.length < 4;
+    const canAddPhoto = canContribute() && tree['Ref'];
     if (photos.length || canAddPhoto) {
       html += `<div class="photos">`;
-      const resolvedPhotos = photos.map(p => resolvePhotoUrl(p, 'w1600'));
-      const resolvedAttr = JSON.stringify(resolvedPhotos).replace(/"/g, '&quot;');
+      const rawAttr = JSON.stringify(photos).replace(/"/g, '&quot;');
       const refAttr = (tree['Ref'] || '').replace(/'/g, '\\\'');
-      photos.forEach((raw, i) => {
+      const shown = photos.slice(0, 4);
+      const overflowCount = photos.length - shown.length;
+      shown.forEach((raw, i) => {
         const thumb = resolvePhotoUrl(raw, 'w280');
-        // Only repo-hosted photos can be deleted via the Apps Script.
-        // External photos (Google Photos etc.) must be removed at their host.
-        const isRepoPhoto = raw && !/^https?:\/\//i.test(raw);
-        const showDelete  = canContribute() && isRepoPhoto && tree['Ref'];
+        const showDelete  = canContribute() && isRepoPhoto(raw) && tree['Ref'];
         const pathAttr    = raw.replace(/'/g, '\\\'');
         const deleteOverlay = showDelete
           ? `<button type="button" class="photo-delete" title="Remove this photo" onclick="event.stopPropagation(); deletePhotoFromTree('${refAttr}', '${pathAttr}'); return false;"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>`
           : '';
-        html += `<div class="photo-thumb-wrap"><a class="photo-thumb-link" href="#" data-photos="${resolvedAttr}" data-index="${i}" onclick="openLightbox(JSON.parse(this.dataset.photos), +this.dataset.index); return false;"><img src="${thumb}" loading="lazy" referrerpolicy="no-referrer" alt="Tree photo" onerror="retryImgLoad(this)"/></a>${deleteOverlay}</div>`;
+        // The last shown thumbnail gets a "+N" cover when there are more
+        // photos than fit here — the lightbox (opened below with the full,
+        // unsliced `photos` list) is where the rest are actually browsed.
+        const overflowBadge = (i === shown.length - 1 && overflowCount > 0)
+          ? `<div class="photo-overflow-badge">+${overflowCount}</div>`
+          : '';
+        html += `<div class="photo-thumb-wrap"><a class="photo-thumb-link" href="#" data-raw="${rawAttr}" data-index="${i}" onclick="openLightbox('${refAttr}', JSON.parse(this.dataset.raw), +this.dataset.index); return false;"><img src="${thumb}" loading="lazy" referrerpolicy="no-referrer" alt="Tree photo" onerror="retryImgLoad(this)"/></a>${overflowBadge}${deleteOverlay}</div>`;
       });
       if (canAddPhoto) {
         html += `<button type="button" class="photo-add-slot" title="Add a photo to this tree" onclick="addPhotoToExistingTree('${refAttr}'); return false;"><span class="photo-add-slot-icon">+📷</span><span class="photo-add-slot-label">Add photo</span></button>`;
@@ -3206,20 +3261,21 @@
   }
 
   // ── LIGHTBOX ─────────────────────────────────────────────────────────────────
-  let lbPhotos = [], lbIndex = 0;
+  let lbRef = null, lbPhotos = [], lbIndex = 0;
 
-  function openLightbox(photos, index) {
+  function openLightbox(ref, photos, index) {
+    lbRef    = ref;
     lbPhotos = photos;
     lbIndex  = index;
     showLightboxPhoto();
+    renderLightboxThumbs();
     document.getElementById('lightbox').classList.add('open');
     preloadOtherLightboxPhotos();
   }
 
   // Warms the browser's HTTP cache for this tree's other photos while the
   // visitor is looking at the current one, so stepping to them later is
-  // instant instead of showing the same load delay again. At most 3 extra
-  // requests (tree photos are capped at 4), so no need to limit to neighbours.
+  // instant instead of showing the same load delay again.
   function preloadOtherLightboxPhotos() {
     lbPhotos.forEach((raw, i) => {
       if (i === lbIndex) return;
@@ -3232,7 +3288,7 @@
   function lbSetOverlaysFixed(fixed) {
     const closeBtn = document.getElementById('lightbox-close-top');
     const hint     = document.getElementById('lightbox-zoom-hint');
-    const bar      = document.getElementById('lightbox-bar');
+    const bar      = document.getElementById('lightbox-controls');
     if (fixed) {
       closeBtn.style.position = 'fixed';
       hint.style.position     = 'fixed';
@@ -3285,13 +3341,18 @@
         } catch (e) {}
       })();
     }
-    document.getElementById('lightbox-open').href = raw;
+    document.getElementById('lightbox-open').href = large;
     document.getElementById('lightbox-prev').disabled = lbIndex === 0;
     document.getElementById('lightbox-next').disabled = lbIndex === lbPhotos.length - 1;
     // Hide nav buttons when there's only one photo
     const showNav = lbPhotos.length > 1;
     document.getElementById('lightbox-prev').style.visibility = showNav ? '' : 'hidden';
     document.getElementById('lightbox-next').style.visibility = showNav ? '' : 'hidden';
+    const deleteBtn = document.getElementById('lightbox-delete');
+    deleteBtn.hidden = !(canContribute() && lbRef && isRepoPhoto(raw));
+    document.querySelectorAll('#lightbox-thumbs .lightbox-thumb').forEach((el, i) => {
+      el.classList.toggle('active', i === lbIndex);
+    });
   }
 
   let lbDragDist = 0, lbPointerOrigin = null;
@@ -3853,19 +3914,12 @@
   //   { filename: 'xxx-1.jpg', base64: '...', dataUrl: 'data:image/jpeg;base64,...' }
   let pendingPhotos = [];
 
-  const MAX_PHOTOS = 4;
   const MAX_PHOTO_DIMENSION = 1600;
   const JPEG_QUALITY = 0.85;
 
   function resetPendingPhotos() {
     pendingPhotos = [];
     document.getElementById('add-tree-photo-thumbs').innerHTML = '';
-    updatePhotoButtons();
-  }
-
-  function updatePhotoButtons() {
-    const full = pendingPhotos.length >= MAX_PHOTOS;
-    document.querySelectorAll('.add-tree-photo-btn').forEach(b => b.classList.toggle('disabled', full));
   }
 
   function renderPhotoThumbs() {
@@ -3883,7 +3937,6 @@
       remove.onclick = () => {
         pendingPhotos.splice(i, 1);
         renderPhotoThumbs();
-        updatePhotoButtons();
       };
       thumb.appendChild(remove);
       grid.appendChild(thumb);
@@ -3969,7 +4022,6 @@
   async function handlePhotoFiles(fileList) {
     const files = [...fileList].filter(f => f.type.startsWith('image/'));
     for (const file of files) {
-      if (pendingPhotos.length >= MAX_PHOTOS) break;
       try {
         const lat = document.getElementById('add-tree-lat').value;
         const lng = document.getElementById('add-tree-lng').value;
@@ -3980,7 +4032,6 @@
       }
     }
     renderPhotoThumbs();
-    updatePhotoButtons();
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -4024,6 +4075,27 @@
     });
   }
 
+  function reorderPhotosOnScript(ref, order, tree) {
+    return postToScript({
+      action: 'reorderPhotos',
+      token: readContributorToken(),
+      ref,
+      order,
+      tree
+    });
+  }
+
+  // Strips `path` out of tree['Photos'] in memory and re-renders that tree's
+  // popup — the shared tail of every successful photo-removal, whether it
+  // was triggered from the popup trash icon or the lightbox delete button.
+  function applyPhotoRemoval(tree, path) {
+    const remaining = parsePhotos(tree['Photos']).filter(p => p !== path);
+    tree['Photos'] = remaining.join(', ');
+    const popup = markers.get(tree)?.getPopup();
+    if (popup) popup.setContent(buildPopup(tree));
+    return remaining;
+  }
+
   // ── Remove a photo from an existing tree (called from the popup trash) ────
   // Confirms, fires the Apps Script delete, then optimistically drops the
   // path from the in-memory tree and re-renders the popup. If the
@@ -4042,11 +4114,126 @@
       showToast('Failed to remove photo: ' + err.message);
       return;
     }
-    const remaining = parsePhotos(tree['Photos']).filter(p => p !== path);
-    tree['Photos'] = remaining.join(', ');
+    applyPhotoRemoval(tree, path);
+    showToast('Photo removed.');
+  }
+
+  // ── Remove the currently-shown photo from the lightbox ───────────────────
+  async function lightboxDeleteCurrentPhoto() {
+    const path = lbPhotos[lbIndex];
+    if (!canContribute() || !lbRef || !path) return;
+    if (!confirm('Remove this photo?')) return;
+    let tree = null;
+    markers.forEach((_marker, t) => { if (!tree && t['Ref'] === lbRef) tree = t; });
+    if (!tree) return;
+    try {
+      await deletePhotoFromScript(lbRef, path, treeLabel(tree));
+    } catch (err) {
+      console.warn('deletePhoto failed:', err);
+      showToast('Failed to remove photo: ' + err.message);
+      return;
+    }
+    applyPhotoRemoval(tree, path);
+    lbPhotos.splice(lbIndex, 1);
+    if (lbPhotos.length === 0) {
+      closeLightbox();
+    } else {
+      lbIndex = Math.min(lbIndex, lbPhotos.length - 1);
+      showLightboxPhoto();
+      renderLightboxThumbs();
+    }
+    showToast('Photo removed.');
+  }
+
+  // ── Drag-to-reorder thumbnail strip ───────────────────────────────────────
+  // Photos are identified by their raw path/URL (assumed unique within one
+  // tree — the same assumption deletePhotoFromTree already makes when
+  // filtering by exact path match) so the dragged photo can be tracked
+  // through re-renders without relying on DOM-node identity.
+  function renderLightboxThumbs() {
+    const strip = document.getElementById('lightbox-thumbs');
+    strip.innerHTML = '';
+    if (!canContribute() || !lbRef || lbPhotos.length < 2) return;
+    lbPhotos.forEach((raw, i) => {
+      const img = document.createElement('img');
+      img.className = 'lightbox-thumb' + (i === lbIndex ? ' active' : '');
+      img.src = resolvePhotoUrl(raw, 'w280');
+      img.referrerPolicy = 'no-referrer';
+      img.draggable = false;
+      img.addEventListener('pointerdown', e => lbThumbPointerDown(e, raw));
+      strip.appendChild(img);
+    });
+  }
+
+  function lbThumbPointerDown(e, path) {
+    const strip = document.getElementById('lightbox-thumbs');
+    const activePath = lbPhotos[lbIndex];
+    const originalOrder = lbPhotos.slice();
+    const startX = e.clientX;
+    let moved = false;
+    e.currentTarget.setPointerCapture(e.pointerId);
+
+    const onMove = ev => {
+      const dx = ev.clientX - startX;
+      if (!moved && Math.abs(dx) < 8) return;
+      moved = true;
+      // Position-based, not midpoint-crossing: recomputed fresh from the
+      // pointer's absolute X each event, so it stays correct even though
+      // the thumbnails it's measuring get re-rendered (new DOM nodes) on
+      // every reorder below.
+      const firstRect = strip.children[0].getBoundingClientRect();
+      const step = firstRect.width + 6; // thumb width + the strip's gap (CSS)
+      let targetIndex = Math.floor((ev.clientX - firstRect.left) / step);
+      targetIndex = Math.max(0, Math.min(lbPhotos.length - 1, targetIndex));
+      const currentIndex = lbPhotos.indexOf(path);
+      if (targetIndex !== currentIndex) {
+        lbPhotos.splice(currentIndex, 1);
+        lbPhotos.splice(targetIndex, 0, path);
+        lbIndex = lbPhotos.indexOf(activePath);
+        renderLightboxThumbs();
+        strip.children[lbPhotos.indexOf(path)].classList.add('dragging');
+      }
+    };
+
+    const onUp = () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      if (!moved) {
+        // A plain tap: jump to that photo.
+        lbIndex = lbPhotos.indexOf(path);
+        showLightboxPhoto();
+        renderLightboxThumbs();
+        return;
+      }
+      renderLightboxThumbs();
+      if (lbPhotos.join('\u0000') !== originalOrder.join('\u0000')) {
+        saveLightboxPhotoOrder(originalOrder, activePath);
+      }
+    };
+
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+  }
+
+  async function saveLightboxPhotoOrder(originalOrder, activePath) {
+    let tree = null;
+    markers.forEach((_marker, t) => { if (!tree && t['Ref'] === lbRef) tree = t; });
+    if (!tree) return;
+    const order = lbPhotos.slice();
+    try {
+      await reorderPhotosOnScript(lbRef, order, treeLabel(tree));
+    } catch (err) {
+      console.warn('reorderPhotos failed:', err);
+      showToast('Failed to save new photo order: ' + err.message);
+      lbPhotos = originalOrder;
+      lbIndex = lbPhotos.indexOf(activePath);
+      showLightboxPhoto();
+      renderLightboxThumbs();
+      return;
+    }
+    tree['Photos'] = order.join(', ');
     const popup = markers.get(tree)?.getPopup();
     if (popup) popup.setContent(buildPopup(tree));
-    showToast('Photo removed.');
   }
 
   // ── Edit tree modal ──────────────────────────────────────────────────────────
@@ -4273,8 +4460,7 @@
     if (!tree) { popupPhotoBusy = false; return; }
 
     const existing  = parsePhotos(tree['Photos']);
-    const remaining = 4 - existing.length;
-    const accepted  = [...fileList].filter(f => f.type.startsWith('image/')).slice(0, Math.max(0, remaining));
+    const accepted  = [...fileList].filter(f => f.type.startsWith('image/'));
     if (accepted.length === 0) { popupPhotoBusy = false; return; }
 
     const popup = markers.get(tree)?.getPopup();
