@@ -990,6 +990,15 @@
         padding-bottom: max(12px, env(safe-area-inset-bottom));
         background: linear-gradient(transparent, rgba(0,0,0,0.7));
       }
+      /* Reorder mode has no photo to anchor against, so let the controls
+         (now headed by the thumb strip) sit in normal flow instead of
+         pinned to the bottom — #lightbox's own flex centering then
+         vertically centers the whole block, same as on desktop. */
+      #lightbox.reorder-mode #lightbox-controls {
+        position: static;
+        padding-bottom: 20px;
+        background: none;
+      }
     }
     #lightbox-bar button, #lightbox-bar a {
       background: none;
