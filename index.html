@@ -990,15 +990,6 @@
         padding-bottom: max(12px, env(safe-area-inset-bottom));
         background: linear-gradient(transparent, rgba(0,0,0,0.7));
       }
-      /* Reorder mode has no photo to anchor against, so let the controls
-         (now headed by the thumb strip) sit in normal flow instead of
-         pinned to the bottom — #lightbox's own flex centering then
-         vertically centers the whole block, same as on desktop. */
-      #lightbox.reorder-mode #lightbox-controls {
-        position: static;
-        padding-bottom: 20px;
-        background: none;
-      }
     }
     #lightbox-bar button, #lightbox-bar a {
       background: none;
@@ -1019,14 +1010,25 @@
     #lightbox-bar button:hover, #lightbox-bar a:hover { background: rgba(255,255,255,0.15); }
     #lightbox-bar .nav { font-size: 20px; line-height: 1; }
     #lightbox-bar .nav:disabled { opacity: 0.25; cursor: default; }
+    /* Independent of #lightbox-controls (the button bar) on purpose: reorder
+       mode should center the thumbnails in the lightbox while leaving the
+       bar exactly where it always sits (bottom-pinned on mobile, just under
+       the photo on desktop) — so this is positioned relative to #lightbox
+       itself rather than flowing alongside the bar. */
     #lightbox-thumbs {
       display: none;
+      position: absolute;
+      left: 0; right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      justify-content: center;
+      flex-wrap: wrap;
       gap: 6px;
-      padding: 0 16px 8px;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
+      padding: 0 16px;
+      max-height: calc(100% - 120px);
+      overflow-y: auto;
     }
-    #lightbox.reorder-mode #lightbox-thumbs { display: flex; justify-content: center; flex-wrap: wrap; }
+    #lightbox.reorder-mode #lightbox-thumbs { display: flex; }
     #lightbox-thumbs .lightbox-thumb {
       flex: 0 0 auto;
       width: 48px;
@@ -1087,12 +1089,13 @@
     }
     #lightbox-date.visible { display: block; }
     @keyframes lb-spin { to { transform: rotate(360deg); } }
-    /* Reorder mode replaces the single large photo with the thumbnail
-       strip as the lightbox's main content, so it reads as "editing the
-       set" rather than "viewing one photo" — the strip ends up centered
-       because it's then the only visible flex child of #lightbox. Declared
-       after the .loading/.visible rules above so it wins that tie. */
-    #lightbox.reorder-mode #lightbox-img,
+    /* Reorder mode hides the photo in favour of the thumbnail strip, but
+       uses visibility (not display) so the image keeps its layout space —
+       #lightbox-controls (the button bar) is a flex sibling of the image,
+       and must stay exactly where it always sits rather than drifting to
+       fill the gap. Declared after the .loading/.visible rules above so it
+       wins that tie. */
+    #lightbox.reorder-mode #lightbox-img { visibility: hidden; }
     #lightbox.reorder-mode #lightbox-spinner,
     #lightbox.reorder-mode #lightbox-date,
     #lightbox.reorder-mode #lightbox-zoom-hint {
@@ -1744,8 +1747,8 @@
     <img id="lightbox-img" src="" referrerpolicy="no-referrer" alt="Tree photo" draggable="false" onclick="toggleLightboxZoom(event)"
          onload="document.getElementById('lightbox').classList.remove('loading')"
          onerror="if (!retryImgLoad(this)) document.getElementById('lightbox').classList.remove('loading')"/>
+    <div id="lightbox-thumbs"></div>
     <div id="lightbox-controls">
-      <div id="lightbox-thumbs"></div>
       <div id="lightbox-bar">
         <button class="nav" id="lightbox-prev" onclick="stepLightbox(-1)">&#8249;</button>
         <a id="lightbox-open" href="" target="_blank" rel="noopener" referrerpolicy="no-referrer">
