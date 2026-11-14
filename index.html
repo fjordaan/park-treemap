@@ -889,7 +889,7 @@
     .tree-popup .photo-delete svg { display: block; }
     .tree-popup .photo-overflow-badge {
       position: absolute;
-      bottom: 4px; left: 4px;
+      bottom: 4px; right: 24px;
       background: rgba(0,0,0,0.65);
       color: white;
       font-weight: 600;
@@ -1017,7 +1017,7 @@
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
     }
-    #lightbox.reorder-mode #lightbox-thumbs { display: flex; }
+    #lightbox.reorder-mode #lightbox-thumbs { display: flex; justify-content: center; flex-wrap: wrap; }
     #lightbox-thumbs .lightbox-thumb {
       flex: 0 0 auto;
       width: 48px;
@@ -1078,6 +1078,17 @@
     }
     #lightbox-date.visible { display: block; }
     @keyframes lb-spin { to { transform: rotate(360deg); } }
+    /* Reorder mode replaces the single large photo with the thumbnail
+       strip as the lightbox's main content, so it reads as "editing the
+       set" rather than "viewing one photo" — the strip ends up centered
+       because it's then the only visible flex child of #lightbox. Declared
+       after the .loading/.visible rules above so it wins that tie. */
+    #lightbox.reorder-mode #lightbox-img,
+    #lightbox.reorder-mode #lightbox-spinner,
+    #lightbox.reorder-mode #lightbox-date,
+    #lightbox.reorder-mode #lightbox-zoom-hint {
+      display: none;
+    }
 
     /* ── Admin panel ─────────────────────────────────────────────────────── */
     #admin-panel {
