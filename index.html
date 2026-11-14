@@ -889,15 +889,14 @@
     .tree-popup .photo-delete svg { display: block; }
     .tree-popup .photo-overflow-badge {
       position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0,0,0,0.55);
+      bottom: 4px; left: 4px;
+      background: rgba(0,0,0,0.65);
       color: white;
       font-weight: 600;
-      font-size: 15px;
-      border-radius: 3px;
+      font-size: 11px;
+      line-height: 1;
+      padding: 4px 7px;
+      border-radius: 999px;
       pointer-events: none;
     }
     .tree-popup .photo-add-corner {
@@ -972,6 +971,7 @@
     #lightbox-grad-bottom { bottom: 0; background: linear-gradient(to top,   rgba(0,0,0,0.55), transparent); }
     #lightbox-controls {
       width: 100%;
+      padding-bottom: 20px;
     }
     #lightbox-bar {
       display: flex;
@@ -997,22 +997,27 @@
       border-radius: 4px;
       color: white;
       font-size: 13px;
-      padding: 5px 12px;
+      padding: 0 10px;
+      height: 30px;
+      box-sizing: border-box;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
       text-decoration: none;
       white-space: nowrap;
     }
     #lightbox-bar button:hover, #lightbox-bar a:hover { background: rgba(255,255,255,0.15); }
-    #lightbox-bar .nav { font-size: 20px; padding: 3px 14px; }
+    #lightbox-bar .nav { font-size: 20px; line-height: 1; }
     #lightbox-bar .nav:disabled { opacity: 0.25; cursor: default; }
     #lightbox-thumbs {
-      display: flex;
+      display: none;
       gap: 6px;
       padding: 0 16px 8px;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
     }
-    #lightbox-thumbs:empty { display: none; }
+    #lightbox.reorder-mode #lightbox-thumbs { display: flex; }
     #lightbox-thumbs .lightbox-thumb {
       flex: 0 0 auto;
       width: 48px;
@@ -1606,10 +1611,13 @@
       <div id="lightbox-bar">
         <button class="nav" id="lightbox-prev" onclick="stepLightbox(-1)">&#8249;</button>
         <a id="lightbox-open" href="" target="_blank" rel="noopener" referrerpolicy="no-referrer">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:5px"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>Open in new tab
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:5px"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>New tab
         </a>
         <button id="lightbox-delete" title="Remove this photo" onclick="lightboxDeleteCurrentPhoto()" hidden>
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:5px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>Remove
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        </button>
+        <button id="lightbox-reorder" title="Reorder photos" onclick="toggleLightboxReorder()" hidden>
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="M16 21l4-4-4-4"/><path d="M20 17H4"/></svg>
         </button>
         <button class="nav" id="lightbox-next" onclick="stepLightbox(1)">&#8250;</button>
       </div>
@@ -3131,7 +3139,33 @@
   }
 
   // ── LIGHTBOX ─────────────────────────────────────────────────────────────────
-  let lbRef = null, lbPhotos = [], lbIndex = 0;
+  let lbRef = null, lbPhotos = [], lbIndex = 0, lbReorderMode = false;
+
+  const LB_REORDER_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="M16 21l4-4-4-4"/><path d="M20 17H4"/></svg>';
+  const LB_DONE_ICON    = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+
+  // Toggles the thumbnail strip on/off (hidden by default, since reordering
+  // is a less-common action than just browsing) and swaps the button's own
+  // icon between the reorder glyph and a checkmark for "done".
+  function toggleLightboxReorder() {
+    lbReorderMode = !lbReorderMode;
+    document.getElementById('lightbox').classList.toggle('reorder-mode', lbReorderMode);
+    const btn = document.getElementById('lightbox-reorder');
+    btn.innerHTML = lbReorderMode ? LB_DONE_ICON : LB_REORDER_ICON;
+    btn.title = lbReorderMode ? 'Done reordering' : 'Reorder photos';
+  }
+
+  // Forces reorder mode off (e.g. when the lightbox closes, or a delete
+  // leaves too few photos to reorder) without relying on the user having
+  // clicked the checkmark.
+  function exitLightboxReorder() {
+    if (!lbReorderMode) return;
+    lbReorderMode = false;
+    document.getElementById('lightbox').classList.remove('reorder-mode');
+    const btn = document.getElementById('lightbox-reorder');
+    btn.innerHTML = LB_REORDER_ICON;
+    btn.title = 'Reorder photos';
+  }
 
   function openLightbox(ref, photos, index) {
     lbRef    = ref;
@@ -3220,6 +3254,9 @@
     document.getElementById('lightbox-next').style.visibility = showNav ? '' : 'hidden';
     const deleteBtn = document.getElementById('lightbox-delete');
     deleteBtn.hidden = !(canContribute() && lbRef && isRepoPhoto(raw));
+    const canReorder = canContribute() && lbRef && lbPhotos.length > 1;
+    document.getElementById('lightbox-reorder').hidden = !canReorder;
+    if (!canReorder) exitLightboxReorder();
     document.querySelectorAll('#lightbox-thumbs .lightbox-thumb').forEach((el, i) => {
       el.classList.toggle('active', i === lbIndex);
     });
@@ -3319,6 +3356,7 @@
 
   function closeLightbox() {
     lbResetZoom();
+    exitLightboxReorder();
     document.getElementById('lightbox').classList.remove('open');
     document.getElementById('lightbox-img').src = '';
     document.getElementById('lightbox-date').classList.remove('visible');
