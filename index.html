@@ -900,6 +900,24 @@
       border-radius: 3px;
       pointer-events: none;
     }
+    .tree-popup .photo-add-corner {
+      position: absolute;
+      bottom: 4px; right: 4px;
+      width: 22px; height: 22px;
+      border: none;
+      padding: 0;
+      border-radius: 50%;
+      background: rgba(58, 110, 82, 0.85);
+      color: white;
+      font-size: 15px;
+      line-height: 1;
+      font-weight: 600;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      opacity: 0.85;
+      transition: opacity 0.15s, background 0.15s;
+    }
+    .tree-popup .photo-add-corner:hover { opacity: 1; background: rgba(58, 110, 82, 1); }
     .tree-popup .photo-add-slot {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
       gap: 4px;
@@ -2414,9 +2432,15 @@
         const overflowBadge = (i === shown.length - 1 && overflowCount > 0)
           ? `<div class="photo-overflow-badge">+${overflowCount}</div>`
           : '';
-        html += `<div class="photo-thumb-wrap"><a class="photo-thumb-link" href="#" data-raw="${rawAttr}" data-index="${i}" onclick="openLightbox('${refAttr}', JSON.parse(this.dataset.raw), +this.dataset.index); return false;"><img src="${thumb}" loading="lazy" referrerpolicy="no-referrer" alt="Tree photo" onerror="retryImgLoad(this)"/></a>${overflowBadge}${deleteOverlay}</div>`;
+        // Once the grid is full (4 shown), there's no room left for a
+        // separate "Add photo" slot — fold it into a small corner button
+        // on the last thumbnail instead (see below the loop).
+        const addCorner = (i === shown.length - 1 && shown.length === 4 && canAddPhoto)
+          ? `<button type="button" class="photo-add-corner" title="Add a photo to this tree" onclick="event.stopPropagation(); addPhotoToExistingTree('${refAttr}'); return false;">+</button>`
+          : '';
+        html += `<div class="photo-thumb-wrap"><a class="photo-thumb-link" href="#" data-raw="${rawAttr}" data-index="${i}" onclick="openLightbox('${refAttr}', JSON.parse(this.dataset.raw), +this.dataset.index); return false;"><img src="${thumb}" loading="lazy" referrerpolicy="no-referrer" alt="Tree photo" onerror="retryImgLoad(this)"/></a>${overflowBadge}${deleteOverlay}${addCorner}</div>`;
       });
-      if (canAddPhoto) {
+      if (canAddPhoto && shown.length < 4) {
         html += `<button type="button" class="photo-add-slot" title="Add a photo to this tree" onclick="addPhotoToExistingTree('${refAttr}'); return false;"><span class="photo-add-slot-icon">+📷</span><span class="photo-add-slot-label">Add photo</span></button>`;
       }
       html += `</div>`;
