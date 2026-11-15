@@ -1015,20 +1015,31 @@
        bar exactly where it always sits (bottom-pinned on mobile, just under
        the photo on desktop) — so this is positioned relative to #lightbox
        itself rather than flowing alongside the bar. */
-    #lightbox-thumbs {
+    #lightbox-reorder-panel {
       display: none;
       position: absolute;
       left: 0; right: 0;
       top: 50%;
       transform: translateY(-50%);
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 6px;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
       padding: 0 16px;
       max-height: calc(100% - 120px);
       overflow-y: auto;
     }
-    #lightbox.reorder-mode #lightbox-thumbs { display: flex; }
+    #lightbox.reorder-mode #lightbox-reorder-panel { display: flex; }
+    #lightbox-thumbs {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    #lightbox-reorder-hint {
+      font-size: 11px;
+      color: rgba(255,255,255,0.6);
+      pointer-events: none;
+    }
     #lightbox-thumbs .lightbox-thumb {
       flex: 0 0 auto;
       width: 48px;
@@ -1043,6 +1054,9 @@
     }
     #lightbox-thumbs .lightbox-thumb.active { opacity: 1; border-color: white; }
     #lightbox-thumbs .lightbox-thumb.dragging { opacity: 0.9; cursor: grabbing; position: relative; z-index: 1; }
+    @media (min-width: 768px) {
+      #lightbox-thumbs .lightbox-thumb { width: 240px; height: 240px; }
+    }
     #lightbox-close-top {
       position: absolute;
       top: 12px;
@@ -1629,7 +1643,10 @@
     <img id="lightbox-img" src="" referrerpolicy="no-referrer" alt="Tree photo" draggable="false" onclick="toggleLightboxZoom(event)"
          onload="document.getElementById('lightbox').classList.remove('loading')"
          onerror="if (!retryImgLoad(this)) document.getElementById('lightbox').classList.remove('loading')"/>
-    <div id="lightbox-thumbs"></div>
+    <div id="lightbox-reorder-panel">
+      <div id="lightbox-thumbs"></div>
+      <div id="lightbox-reorder-hint">Click or tap and drag to reorder</div>
+    </div>
     <div id="lightbox-controls">
       <div id="lightbox-bar">
         <button class="nav" id="lightbox-prev" onclick="stepLightbox(-1)">&#8249;</button>
@@ -1640,7 +1657,7 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
         </button>
         <button id="lightbox-reorder" title="Reorder photos" onclick="toggleLightboxReorder()" hidden>
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="M16 21l4-4-4-4"/><path d="M20 17H4"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
         </button>
         <button class="nav" id="lightbox-next" onclick="stepLightbox(1)">&#8250;</button>
       </div>
@@ -3164,7 +3181,7 @@
   // ── LIGHTBOX ─────────────────────────────────────────────────────────────────
   let lbRef = null, lbPhotos = [], lbIndex = 0, lbReorderMode = false;
 
-  const LB_REORDER_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="M16 21l4-4-4-4"/><path d="M20 17H4"/></svg>';
+  const LB_REORDER_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>';
   const LB_DONE_ICON    = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
 
   // Toggles the thumbnail strip on/off (hidden by default, since reordering
@@ -4130,10 +4147,10 @@
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
       if (!moved) {
-        // A plain tap: jump to that photo.
+        // A plain tap: jump to that photo and leave reorder mode to show it.
         lbIndex = lbPhotos.indexOf(path);
         showLightboxPhoto();
-        renderLightboxThumbs();
+        exitLightboxReorder();
         return;
       }
       renderLightboxThumbs();
