@@ -112,14 +112,28 @@ function handleFeedback(data) {
 // git or re-derives past state — every mutation below writes its own row at
 // the moment it happens. `count` is only meaningful for 'appendPhotos' (more
 // than one photo can be added in a single call); leave it undefined elsewhere.
-function appendHistory(action, ref, treeLabel, count) {
+// `prevRef` is only meaningful for 'repositionTree' (Ref is lat/lng-derived,
+// so moving a tree changes it) — it records the Ref this tree had *before*
+// this particular move. Combined with handleRepositionTree's forward-rewrite
+// of this row's own 'Ref' column on every later move of the same tree,
+// `prevRef` always resolves to the tree's *current* Ref in a single lookup,
+// however many times it's moved since — see resolveStaleRef() in index.html,
+// which a stale shared/bookmarked tree URL falls back to.
+function appendHistory(action, ref, treeLabel, count, prevRef) {
   const ss = SpreadsheetApp.openById(sheetId());
   let sheet = ss.getSheetByName(HISTORY_SHEET);
   if (!sheet) {
     sheet = ss.insertSheet(HISTORY_SHEET);
-    sheet.appendRow(['Timestamp', 'Action', 'Ref', 'Tree', 'Count']);
+    sheet.appendRow(['Timestamp', 'Action', 'Ref', 'Tree', 'Count', 'Prev Ref']);
+  } else {
+    // Sheets created before 'Prev Ref' existed — add the column in place so
+    // existing rows and their positions are undisturbed.
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (headers.indexOf('Prev Ref') === -1) {
+      sheet.getRange(1, headers.length + 1).setValue('Prev Ref');
+    }
   }
-  sheet.appendRow([new Date(), action, ref || '', treeLabel || '', count || '']);
+  sheet.appendRow([new Date(), action, ref || '', treeLabel || '', count || '', prevRef || '']);
 }
 
 // ── Add tree ──────────────────────────────────────────────────────────────────
@@ -522,7 +536,7 @@ function handleRepositionTree(data) {
     }
   }
 
-  appendHistory('repositionTree', newRef, data.tree);
+  appendHistory('repositionTree', newRef, data.tree, undefined, data.ref);
   return jsonResponse({ status: 'ok' });
 }
 
