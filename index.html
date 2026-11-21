@@ -3007,6 +3007,36 @@
     return false;
   }
 
+  // A shared/bookmarked tree URL (?ref=...) can go stale: Ref is derived
+  // from lat/lng, so repositioning a tree changes it. handleRepositionTree
+  // records the pre-move Ref in History's 'Prev Ref' column on that move's
+  // own row, and forward-rewrites that same row's 'Ref' column on every
+  // later move of the same tree — so a direct 'Prev Ref' match always gives
+  // the tree's current Ref in one lookup, however many times it's moved
+  // since. Returns the current Ref string, or null if nothing matches (tree
+  // never moved under this scheme, predates it, or was deleted).
+  async function resolveStaleRef(ref) {
+    const target = parseFloat(ref);
+    if (isNaN(target)) return null;
+    try {
+      const resp = await fetch(HISTORY_CSV_URL);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const text = await resp.text();
+      const rows = parseCSV(text);
+      if (rows.length < 2) return null;
+      const headers = rows[0].map(h => h.trim());
+      const prevRefCol = headers.indexOf('Prev Ref');
+      const refCol = headers.indexOf('Ref');
+      if (prevRefCol === -1 || refCol === -1) return null;
+      for (const row of rows.slice(1)) {
+        if (parseFloat(row[prevRefCol]) === target) return row[refCol];
+      }
+    } catch (err) {
+      console.warn('Could not resolve stale tree ref:', err);
+    }
+    return null;
+  }
+
   const parkMarkerLayer = L.layerGroup();
   const PARK_ZOOM_THRESHOLD = 19;  // dot visible below this zoom level
   const PARK_LABEL_THRESHOLD = 18; // label visible below this zoom level (zoom 17 and below)
@@ -3113,9 +3143,21 @@
     updateLabels();
 
     if (!silent) {
-      // Open popup for a specific tree if ?ref= is in the URL
+      // Open popup for a specific tree if ?ref= is in the URL. The Ref may
+      // be stale (the tree was repositioned since this link was shared) —
+      // fall back to resolveStaleRef before giving up.
       const refParam = new URLSearchParams(window.location.search).get('ref');
-      if (refParam) focusTreeByRef(refParam);
+      if (refParam && !focusTreeByRef(refParam)) {
+        resolveStaleRef(refParam).then(currentRef => {
+          if (currentRef && focusTreeByRef(currentRef)) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('ref', currentRef);
+            history.replaceState({}, '', url);
+          } else {
+            showToast('This tree may have been moved or removed.');
+          }
+        });
+      }
     }
 
     if (!silent) applyFilters();
