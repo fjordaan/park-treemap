@@ -4160,21 +4160,25 @@
     const activePath = lbPhotos[lbIndex];
     const originalOrder = lbPhotos.slice();
     const startX = e.clientX;
+    const startY = e.clientY;
     let moved = false;
     e.currentTarget.setPointerCapture(e.pointerId);
 
     const onMove = ev => {
-      const dx = ev.clientX - startX;
-      if (!moved && Math.abs(dx) < 8) return;
+      if (!moved && Math.hypot(ev.clientX - startX, ev.clientY - startY) < 8) return;
       moved = true;
-      // Position-based, not midpoint-crossing: recomputed fresh from the
-      // pointer's absolute X each event, so it stays correct even though
-      // the thumbnails it's measuring get re-rendered (new DOM nodes) on
-      // every reorder below.
-      const firstRect = strip.children[0].getBoundingClientRect();
-      const step = firstRect.width + 6; // thumb width + the strip's gap (CSS)
-      let targetIndex = Math.floor((ev.clientX - firstRect.left) / step);
-      targetIndex = Math.max(0, Math.min(lbPhotos.length - 1, targetIndex));
+      // Target is the thumbnail whose centre is nearest the pointer, in
+      // both directions — not position-along-a-single-row, which breaks
+      // once the strip wraps onto more than one row. Recomputed fresh
+      // from the pointer's position each event, so it stays correct even
+      // though the thumbnails it's measuring get re-rendered (new DOM
+      // nodes) on every reorder below.
+      let targetIndex = 0, best = Infinity;
+      [...strip.children].forEach((el, i) => {
+        const r = el.getBoundingClientRect();
+        const d = Math.hypot(ev.clientX - (r.left + r.width / 2), ev.clientY - (r.top + r.height / 2));
+        if (d < best) { best = d; targetIndex = i; }
+      });
       const currentIndex = lbPhotos.indexOf(path);
       if (targetIndex !== currentIndex) {
         lbPhotos.splice(currentIndex, 1);
