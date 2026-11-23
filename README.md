@@ -39,6 +39,8 @@ That's it. Your map is live.
 
 ## Reference
 
+- **[What's new](docs/changelog.md)** – a plain-English look back at how the
+  map has grown since it launched.
 - **[Database fields](docs/05-database-fields.md)** — what each column in the
   spreadsheet means.
 - **[Tag suggestions](docs/06-tag-suggestions.md)** — useful values to copy
