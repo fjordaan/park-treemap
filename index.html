@@ -1655,6 +1655,10 @@
         </div>
       </div>
       <div id="add-tree-extra-fields" style="display:none">
+        <label>Short name
+          <span class="field-hint">Label shown on the map (defaults to scientific name if blank)</span>
+          <input name="short_name" type="text" placeholder="e.g. Oak">
+        </label>
         <div class="add-tree-year-row">
           <label>Year planted
             <input name="year_planted" type="text" inputmode="numeric" placeholder="e.g. 2021">
@@ -2344,6 +2348,21 @@
     return `<span class="tag-pill" style="background:hsl(${hue},60%,93%);color:hsl(${hue},50%,28%)">${esc(tag)}</span>`;
   }
 
+  // Condition pills are coloured by meaning (worst = grey/red, best = green)
+  // rather than by hashing the word. Unknown values fall back to tagPill.
+  const CONDITION_PILL_COLOURS = {
+    dead:      { bg: '#e4e4e4', fg: '#444' },
+    poor:      { bg: '#fde3c4', fg: '#8a4a00' },
+    fair:      { bg: '#fbf1b8', fg: '#6b5800' },
+    good:      { bg: '#d9f2d9', fg: '#1d6b1d' },
+    excellent: { bg: '#c8ecd4', fg: '#0d5a2c' },
+  };
+  function conditionPill(cond) {
+    const c = CONDITION_PILL_COLOURS[cond.toLowerCase()];
+    if (!c) return tagPill(cond);
+    return `<span class="tag-pill" style="background:${c.bg};color:${c.fg}">${esc(cond)}</span>`;
+  }
+
   function parseTags(tagStr) {
     if (!tagStr) return [];
     return tagStr.split(',').map(t => t.trim()).filter(Boolean);
@@ -2500,8 +2519,12 @@
     html += row('Year planted',     tree['Year planted'],     tree['Year planted']     ? ageSuffix : '');
     html += row('Estimated year planted',tree['Est. year planted'],tree['Est. year planted'] ? ageSuffix : '');
     html += row('Year died',        tree['Year died']);
-    html += row('Form',             tree['Form']);
-    html += row('Condition',        tree['Condition']);
+    const pillRow = (label, val, pill) => {
+      const v = (val || '').trim();
+      return v ? `<div class="prop"><b>${label}:</b><div class="tag-pills">${pill(v)}</div></div>` : '';
+    };
+    html += pillRow('Form',         tree['Form'],      tagPill);
+    html += pillRow('Condition',    tree['Condition'], conditionPill);
     html += row('Notes',            tree['Notes']);
 
     const monthVals = (tree['Months (Seasonal interest)'] || '').split(',').map(m => m.trim()).filter(Boolean);
@@ -3137,6 +3160,57 @@
   baseLayers['Street map'].addTo(map);
   L.control.layers(baseLayers, null, { position: 'bottomleft' }).addTo(map);
   map.on('moveend', writeCachedView);
+
+  // ── Double-tap zoom ──────────────────────────────────────────────────────────
+  // Leaflet's double-click zoom relies on the browser's dblclick (or a click
+  // `detail` heuristic), which some mobile browsers, notably iOS Safari, don't
+  // provide for touch. Detect double-taps from pointer events instead, and
+  // handle mouse double-clicks ourselves so the two never both zoom.
+  map.doubleClickZoom.disable();
+  (() => {
+    const container = map.getContainer();
+    const TAP_MS = 300, GAP_MS = 350, MOVE_PX = 12, APART_PX = 40;
+    const active = new Set();
+    let down = null, lastTap = null, multi = false, lastTouchZoom = 0;
+    const onUi = (e) => e.target.closest('.leaflet-control, .leaflet-popup');
+
+    container.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse') return;
+      active.add(e.pointerId);
+      if (active.size > 1) { multi = true; lastTap = null; }
+      down = { x: e.clientX, y: e.clientY, t: Date.now() };
+    });
+    const release = (e) => {
+      if (e.pointerType === 'mouse') return;
+      active.delete(e.pointerId);
+      const wasMulti = multi;
+      if (active.size === 0) multi = false;
+      if (e.type !== 'pointerup' || wasMulti || !down || onUi(e)) { down = null; return; }
+      const now = Date.now();
+      const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+      const isTap = moved < MOVE_PX && now - down.t < TAP_MS;
+      down = null;
+      if (!isTap) { lastTap = null; return; }
+      if (lastTap && now - lastTap.t < GAP_MS &&
+          Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < APART_PX) {
+        lastTap = null;
+        lastTouchZoom = now;
+        const pt = map.mouseEventToContainerPoint(e);
+        map.setZoomAround(pt, map.getZoom() + 1);
+      } else {
+        lastTap = { x: e.clientX, y: e.clientY, t: now };
+      }
+    };
+    container.addEventListener('pointerup', release);
+    container.addEventListener('pointercancel', release);
+
+    // Mouse (and any browser-generated dblclick not already handled above).
+    map.on('dblclick', (e) => {
+      if (Date.now() - lastTouchZoom < 800) return;
+      const oe = e.originalEvent;
+      map.setZoomAround(e.containerPoint, map.getZoom() + (oe && oe.shiftKey ? -1 : 1));
+    });
+  })();
 
   // Map<treeObject, L.Marker>
   const markers = new Map();
@@ -4742,6 +4816,7 @@
       lng,
       sci:              addSciVal,
       common:           addComVal,
+      short_name:       form.elements['short_name'].value.trim(),
       tags:             tagifyInstance  ? tagifyInstance.value.map(t => t.value).join(', ') : '',
       notes:            form.elements['notes'].value.trim(),
       year_planted:     form.elements['year_planted'].value.trim(),
